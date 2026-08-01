@@ -1,0 +1,41 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    # Windows is in the matrix deliberately: this tool is used on Windows, and the
+    # bugs that matter there (path separators, encodings, line endings) do not
+    # reproduce on Linux.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install
+        run: uv sync --extra dev --extra export
+
+      - name: Lint
+        run: uv run ruff check ultimatescrape/ tests/
+
+      - name: Test
+        # No network access is required by the suite, so CI failures are real
+        # failures rather than flaky external APIs.
+        run: uv run pytest tests/ -q

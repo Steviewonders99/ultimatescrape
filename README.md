@@ -1,31 +1,83 @@
 # UltimateScrape
 
-Swarm research infrastructure. It fans out large fleets of Kimi K2.6 agents across
-the open web, LinkedIn, and 61 official statistics and company-registry APIs, then
-deduplicates, verifies, and synthesises what they bring back.
+[![tests](https://github.com/Steviewonders99/ultimatescrape/actions/workflows/ci.yml/badge.svg)](https://github.com/Steviewonders99/ultimatescrape/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![platform](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-lightgrey.svg)](#install)
 
-The point is not that it runs many agents. The point is what happens **after** they
-run: every claimed URL is liveness-checked deterministically, every finding can be
-adjudicated by independent adversarial verifiers, and every number in the final
-report is computed in Python rather than recalled by a model. A swarm without that
-back half is a very expensive way to generate confident-sounding text.
+**An open-source deep research agent that checks its own homework.** It fans out
+hundreds of small LLM agents over a research question, then does the part most
+research agents skip: every URL an agent cites is liveness-checked, every finding
+is attacked by independent adversarial verifiers, and every number in the final
+report is computed in Python rather than recalled by a model.
+
+Most deep-research tools hand you a confident report with citations nobody
+checked. This one tells you which findings survived checking, which were refuted,
+how many independent agents corroborated each, and which cited sources were dead.
+
+```mermaid
+flowchart LR
+    A[targets x dimensions] --> B[N parallel agents]
+    B --> C[merge + corroboration count]
+    C --> D[liveness-check every cited URL]
+    D --> E[adversarial verifiers<br/>distinct lenses, majority vote]
+    E --> F[synthesis]
+    F --> G[markdown / csv / xlsx / json]
+```
+
+## Why
+
+- **Citations are treated as claims, not evidence.** A real GET on every cited
+  URL, and a dead URL overrides any amount of model agreement.
+- **Verifiers try to refute, not confirm.** Each gets a different lens — factual
+  accuracy, recency, specificity. Three identical skeptics agree with each other;
+  three different ones do not.
+- **Models judge, code computes.** Every number, dedupe and URL check happens in
+  Python and is asserted.
+- **It stops itself.** A shared ledger raises the moment a run crosses your spend
+  ceiling, so a runaway costs one call rather than your budget. ~$0.066/agent.
+- **Interrupt it safely.** Every agent checkpoints to disk; `resume` re-dispatches
+  only what never finished. You never pay twice.
+- **Batteries for real research** — 61 government statistics and company-registry
+  APIs catalogued with their individual quirks (41 need no key), competitor
+  job-board feeds with published pay rates, and a local knowledge graph that
+  accumulates across runs with full provenance.
+
+## Quickstart
+
+```bash
+git clone https://github.com/Steviewonders99/ultimatescrape.git
+cd ultimatescrape
+uv venv --python 3.13 && uv pip install -e ".[dev,export]"
+```
+
+Two commands work with **no credentials at all** — start there:
+
+```bash
+uscrape platforms                              # 18 competitor platforms, and how each is reached
+uscrape jobs -p imerit -p appen --pay-only     # live listings with published pay rates
+```
+
+Add one key (`OPENROUTER_API_KEY`) and the research engine turns on:
 
 ```bash
 uscrape doctor                                    # what's live before you spend anything
-uscrape company "Toast" "Square" "Lightspeed"     # 3 companies × 8 dimensions = 24 agents
+uscrape company "Toast" "Square" "Lightspeed"     # 3 companies x 8 dimensions = 24 agents
 uscrape market "United States" "Canada" -t "restaurant POS software"
-uscrape vendor -c Brazil -c Vietnam -p "small egocentric video data collection studios"
+uscrape vendor -c Brazil -c Vietnam -p "small video data collection studios"
 uscrape resume latest                             # finish an interrupted run, paying only for gaps
 
-uscrape jobs --pay-only                           # competitor rates: Scale, Appen, iMerit, Handshake…
 uscrape ga4 run geo --days 28                     # engagement by country and city
 uscrape graph show "Scale AI" --provenance        # what we know, and who said it
-uscrape publish latest --dry-run                  # finalised docs → SharePoint
 ```
 
-Everything is configured in [`uscrape.toml`](uscrape.toml) — output formats,
-which competitors to watch, whether the graph is on, where SharePoint publishes.
-Environment variables override it, so CI never needs the file edited.
+Windows users: run `.\setup.ps1` and see [`ONBOARDING.md`](ONBOARDING.md).
+
+Everything is configured in [`uscrape.toml`](uscrape.toml) — output formats, which
+competitors to watch, whether the graph is on. Environment variables override it,
+so CI never needs the file edited.
+
+If this is useful to you, a star helps other people find it.
 
 ---
 
@@ -66,41 +118,22 @@ predecessors precisely because it never let an LLM do arithmetic.
 
 ---
 
-## Install
-
-**Windows** — see [`ONBOARDING.md`](ONBOARDING.md) for the full walkthrough:
-
-```powershell
-git clone https://github.com/Steviewonders99/ultimatescrape.git
-cd ultimatescrape
-.\setup.ps1
-```
-
-**macOS / Linux:**
+## Install in more detail
 
 ```bash
-git clone https://github.com/Steviewonders99/ultimatescrape.git
-cd ultimatescrape
 uv venv --python 3.13
 uv pip install -e ".[dev,export]"
-cp .env.example .env          # then fill in at minimum OPENROUTER_API_KEY
+cp .env.example .env          # then set OPENROUTER_API_KEY
 ```
 
-Two commands work with **no credentials at all** — start there:
+`config.py` reads `./.env` first, then any file listed in `USCRAPE_ENV_FALLBACKS`,
+which lets you point at an existing `.env` elsewhere instead of copying secrets
+into a second file. Separate paths with the platform separator (`;` on Windows,
+`:` elsewhere).
 
-```bash
-uscrape platforms
-uscrape jobs -p imerit -p appen --pay-only
-```
-
-`config.py` reads `./.env` first, then any file listed in
-`USCRAPE_ENV_FALLBACKS` — which lets you point at an existing `.env` elsewhere on
-the machine instead of copying secrets into a second file. Separate paths with the
-platform separator (`;` on Windows, `:` elsewhere).
-
-Two optional tiers. Both are heavy, and neither activates on its own — the
-browser tier is used only when an HTTP fetch comes back thin, and the LinkedIn
-parser tier stays inert until you give it a session.
+Two optional tiers. Both are heavy, and neither activates on its own — the browser
+tier is used only when an HTTP fetch comes back thin, and the LinkedIn parser tier
+stays inert until you give it a session.
 
 ```bash
 uv pip install -e ".[crawl]" && crawl4ai-setup                    # headless browser
@@ -108,8 +141,6 @@ uv pip install -e ".[linkedin]" && patchright install chromium    # LinkedIn par
 ```
 
 Read [`docs/LINKEDIN.md`](docs/LINKEDIN.md) before enabling the second one.
-
----
 
 ## Layers
 
