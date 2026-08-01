@@ -199,10 +199,9 @@ Three API behaviours are handled rather than left to bite: the nine-dimension
 ceiling, `(not set)` being a literal string rather than null, and offset
 pagination for anything wide.
 
-> The refresh token authenticates as **one person**, and GA4's audit log
-> attributes every query to whoever minted it. Sharing it means sharing a personal
-> Google credential. See [`docs/API_KEYS.md`](docs/API_KEYS.md) for the two
-> cleaner arrangements.
+> A refresh token is tied to the account that minted it and expires if that
+> account's password changes or it goes ~6 months unused — the error is
+> `invalid_grant`. See [`docs/API_KEYS.md`](docs/API_KEYS.md).
 
 ### `graph/` — local knowledge graph
 

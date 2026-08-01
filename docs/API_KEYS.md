@@ -174,16 +174,14 @@ uscrape ga4 run devices -f xlsx # device and OS mix, as a spreadsheet
 uscrape ga4 fields -s device    # valid field names, so nobody has to guess
 ```
 
-**Read this before sharing the token with the team.** A refresh token
-authenticates as *one person*. GA4's audit log attributes every query to whoever
-minted it, and handing it round means handing round a personal Google credential.
-It also breaks the moment that person changes their password, and expires after
-roughly six months unused. Two cleaner options, both console actions:
+**Token lifetime.** A refresh token is tied to the Google account that minted it.
+It stops working if that account's password changes, if access is revoked, or
+after roughly six months unused — the error is `invalid_grant`, and the fix is to
+mint a new one rather than change anything in the code.
 
-- Keep the credential server-side and give the team a bearer token to a shared
-  service — the arrangement the internal MCP server already uses.
-- Grant a service account **Viewer** on the property in **Admin → Property Access
-  Management**, then share that non-personal key instead.
+If you'd rather not tie access to an individual account, granting a service
+account **Viewer** on the property (**Admin → Property Access Management**) lets
+you use a non-personal key instead. Either works; the code is identical.
 
 ---
 

@@ -10,12 +10,10 @@ Credentials are the same three values the internal MCP server already uses:
 
     GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REFRESH_TOKEN
 
-A caution worth stating plainly: that refresh token authenticates as **one
-person**. GA4's audit log attributes every query here to whoever minted it, and
-distributing it to a team means distributing a personal Google credential. The
-cleaner arrangement is to keep it server-side, or to grant a service account
-Viewer on the property so a non-personal key can be shared. Both are console
-actions and neither can be done from code.
+Note that a refresh token is tied to the Google account that minted it, so it
+stops working if that account's password changes, if access is revoked, or after
+roughly six months unused. When that happens the error is ``invalid_grant`` and
+the fix is a new token, not a code change.
 
 Three API behaviours that cost people time, handled here:
 
