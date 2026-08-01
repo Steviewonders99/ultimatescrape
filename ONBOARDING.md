@@ -72,7 +72,7 @@ contract roles against iMerit's $3–20/hr — iMerit's rates are in **local
 currency**, which is what makes that comparison interesting rather than alarming.
 
 ```powershell
-uscrape sources --ready       # 42 official statistics APIs usable with no key
+uscrape sources --ready       # 41 official statistics APIs usable with no key
 ```
 
 ---

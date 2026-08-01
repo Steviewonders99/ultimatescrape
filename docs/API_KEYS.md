@@ -1,7 +1,7 @@
 # API keys — where to get them and how to set them
 
 Every key below is **free** unless marked otherwise. You do not need most of them:
-42 of the 61 catalogued data sources work with no key at all. Start with none,
+41 of the 61 catalogued data sources work with no key at all. Start with none,
 run `uscrape doctor`, and add only what a specific job asks for.
 
 ## How keys are loaded

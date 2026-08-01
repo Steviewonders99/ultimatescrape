@@ -111,7 +111,7 @@ patchright install chromium
 ## Layers
 
 ```
-sources/     official APIs — 61 catalogued, 42 usable with no key at all
+sources/     official APIs — 61 catalogued, 41 usable with no key at all
 jobboards/   competitor and worker-gig feeds, with published pay rates
 ga4/         analytics reporting, no Google SDK required
 fetch/       polite HTTP with retries and robots, plus a Crawl4AI browser tier
