@@ -98,13 +98,16 @@ uscrape jobs -p imerit -p appen --pay-only
 the machine instead of copying secrets into a second file. Separate paths with the
 platform separator (`;` on Windows, `:` elsewhere).
 
-Optional tiers, both heavy, both off by default:
+Two optional tiers. Both are heavy, and neither activates on its own — the
+browser tier is used only when an HTTP fetch comes back thin, and the LinkedIn
+parser tier stays inert until you give it a session.
 
 ```bash
-uv pip install -e ".[crawl]" && crawl4ai-setup             # headless browser tier
-uv pip install "linkedin-scraper>=3.1" patchright          # LinkedIn parser tier
-patchright install chromium
+uv pip install -e ".[crawl]" && crawl4ai-setup                    # headless browser
+uv pip install -e ".[linkedin]" && patchright install chromium    # LinkedIn parsers
 ```
+
+Read [`docs/LINKEDIN.md`](docs/LINKEDIN.md) before enabling the second one.
 
 ---
 

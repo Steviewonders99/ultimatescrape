@@ -145,7 +145,7 @@ class Settings:
 
     # LinkedIn
     linkedin_tiers: list[str] = field(
-        default_factory=lambda: _env_list("USCRAPE_LINKEDIN_TIERS", "vendor,mcp,jina")
+        default_factory=lambda: _env_list("USCRAPE_LINKEDIN_TIERS", "vendor,mcp,parser,jina")
     )
 
     def price(self, model: str) -> tuple[float, float]:

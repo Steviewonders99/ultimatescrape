@@ -20,8 +20,11 @@ Two practical consequences:
 
 ## Tier chain
 
-Configured with `USCRAPE_LINKEDIN_TIERS`, default `vendor,mcp,jina`. Each tier is
-skipped when unconfigured, so removing a key silently degrades rather than failing.
+Configured with `USCRAPE_LINKEDIN_TIERS`, default `vendor,mcp,parser,jina`. Each
+tier is skipped when unconfigured, so removing a key degrades the chain rather
+than failing it. That is why `parser` can sit in the default list safely: with no
+`LINKEDIN_PROFILE_DIR` and no `LINKEDIN_LI_AT` it reports `unconfigured` and is
+never reached, so installing this repo never touches LinkedIn on its own.
 
 ### 1. `vendor` — Proxycurl / Bright Data / Apify
 
@@ -44,7 +47,13 @@ export LINKEDIN_MCP_URL=http://localhost:3000/mcp
 
 ### 3. `parser` — our browser, their parsers
 
-Not in the default tier list; opt in explicitly.
+In the default tier list but inert until you give it a session. To enable:
+
+```bash
+uv pip install -e ".[linkedin]"
+patchright install chromium
+export LINKEDIN_PROFILE_DIR=~/.uscrape/linkedin-profile-acct1
+```
 
 `joeyism/linkedin_scraper` is widely recommended and widely misunderstood. **v3.0.0
 (Jan 2026) was a complete rewrite to async Playwright + Pydantic.** The API that
@@ -64,13 +73,32 @@ drives a Patchright persistent context and hands the resulting `Page` straight t
 `PersonScraper` / `CompanyScraper`, which cannot tell the difference because
 Patchright is a drop-in Playwright replacement.
 
-Three upstream defects are handled in that worker:
+Three upstream defects are handled in that worker.
 
-- **Issue #277 — `detect_rate_limit()` false positives on every page.** It reads
-  `body.text_content()`, which includes text from unrendered nodes, and LinkedIn
-  embeds "something went wrong. please try again later." inside its serialized
-  React payload. Every scrape therefore raises `RateLimitError`. Still unpatched as
-  of 3.1.2; we monkeypatch it to read visible text via `inner_text()`.
+**Issue #277 — `detect_rate_limit()` false-positives on every page.** Verified
+against 3.1.2: it reads `body.text_content()`, which includes text from
+unrendered nodes, and matches the phrase `"try again later"` — which LinkedIn
+embeds inside the serialized React payload of ordinary pages. Every scrape
+therefore raises `RateLimitError` before it reads anything.
+
+Our patch reads `inner_text()` instead, so only rendered text counts, and drops
+that one over-broad phrase while keeping `too many requests`, `rate limit` and
+`slow down`. Two details make the naive fix wrong, both of which cost us a
+rewrite:
+
+- `detect_rate_limit(page) -> None` **raises**; it does not return a bool. A
+  replacement returning True/False silently disables detection entirely,
+  including the legitimate checkpoint and CAPTCHA checks.
+- Call sites do `from .utils import detect_rate_limit`, binding the name at
+  import time, so patching `utils` alone reaches nobody. The real sites are
+  `core.auth` and `scrapers.base`, and both must be imported before rebinding.
+
+`tests/test_linkedin_parser.py` pins all of this, and the fix was verified by
+reproducing the bug against a local page shaped like LinkedIn's: upstream raises,
+patched does not, and a genuinely blocked page still raises.
+
+The other two defects:
+
 - **`Company.employees` is never populated in v3.** The field exists on the model
   and nothing writes to it — there is no `/people/` navigation anywhere in the
   package. We scrape it ourselves.

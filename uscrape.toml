@@ -87,7 +87,7 @@ synthesize = true
 
 [linkedin]
 # Tier order. "parser" is deliberately absent — read docs/LINKEDIN.md before adding it.
-tiers = ["vendor", "mcp", "jina"]
+tiers = ["vendor", "mcp", "parser", "jina"]
 
 [jobboards]
 # Competitor and job-board monitoring. Platforms resolve through the ATS

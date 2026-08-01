@@ -18,6 +18,12 @@ dependencies = [
 # The headless-browser crawl tier. Heavy (pulls Playwright + Patchright).
 # Install with: uv pip install -e ".[crawl]" && crawl4ai-setup
 crawl = ["crawl4ai>=0.9.2"]
+
+# LinkedIn parser tier. Pulls joeyism/linkedin_scraper for its profile parsers
+# and Patchright (undetected Chromium) to drive them. Read docs/LINKEDIN.md
+# before enabling — the self-hosted tiers carry account-restriction risk.
+# Install with: uv pip install -e ".[linkedin]" && patchright install chromium
+linkedin = ["linkedin-scraper>=3.1.2", "patchright>=1.49"]
 dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "ruff>=0.5"]
 export = ["openpyxl>=3.1"]
 

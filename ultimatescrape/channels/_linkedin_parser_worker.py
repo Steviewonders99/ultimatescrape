@@ -60,49 +60,101 @@ def _emit(payload: dict) -> None:
     sys.stdout.flush()
 
 
-def _patch_rate_limit_detection() -> bool:
-    """Neutralise upstream issue #277.
+#: Phrases that indicate a genuine block. Upstream also matches
+#: ``"try again later"``, which is the substring LinkedIn embeds in the
+#: serialized React payload of ordinary pages — that one phrase is the whole of
+#: issue #277, so it is deliberately absent here.
+_RATE_LIMIT_PHRASES = (
+    "too many requests",
+    "rate limit",
+    "slow down",
+    "you've reached the weekly limit",
+    "you have reached the weekly limit",
+)
 
-    ``detect_rate_limit`` uses ``locator('body').text_content()``, which returns
-    text from nodes that are not rendered — including the serialized React
-    payload where LinkedIn embeds its generic error string. The result is a
-    false positive on essentially every page. Swapping to ``inner_text()``
-    restricts the check to visible text, which is what it meant to test.
+
+def _patch_rate_limit_detection() -> list[str]:
+    """Neutralise upstream issue #277. Returns the module paths actually patched.
+
+    Two things about the real function make the naive patch wrong, both verified
+    against linkedin_scraper 3.1.2:
+
+    1. ``detect_rate_limit(page) -> None`` **raises** ``RateLimitError``; it does
+       not return a bool. A replacement that returns True/False silently disables
+       detection altogether, including the legitimate checkpoint and CAPTCHA
+       checks — worse than the bug it set out to fix.
+    2. Callers do ``from .utils import detect_rate_limit``, binding the name into
+       their own module at import time. Patching ``utils`` alone therefore
+       reaches nobody. The real call sites are ``core.auth`` and
+       ``scrapers.base``, and both must be imported before they can be patched.
+
+    The fix keeps the URL-checkpoint and CAPTCHA checks exactly as upstream has
+    them, and only changes the page-text check: ``inner_text()`` instead of
+    ``text_content()``, so it reads rendered text rather than the serialized
+    React payload, and without the over-broad "try again later" phrase.
     """
     try:
+        import importlib
+
+        from linkedin_scraper import RateLimitError
         from linkedin_scraper.core import utils
     except ImportError:
-        return False
+        return []
 
-    original = getattr(utils, "detect_rate_limit", None)
-    if original is None:
-        return False
+    if not hasattr(utils, "detect_rate_limit"):
+        return []
 
-    async def detect_rate_limit(page, *args, **kwargs):  # type: ignore[no-untyped-def]
-        markers = (
-            "you've reached the weekly limit",
-            "too many requests",
-            "please try again later",
-        )
+    async def detect_rate_limit(page) -> None:  # type: ignore[no-untyped-def]
+        url = getattr(page, "url", "") or ""
+        if "linkedin.com/checkpoint" in url or "authwall" in url:
+            raise RateLimitError(
+                "LinkedIn security checkpoint detected. Verify the account in a "
+                "headed browser before continuing.",
+                suggested_wait_time=3600,
+            )
         try:
-            visible = (await page.locator("body").inner_text(timeout=2000)).lower()
-        except Exception:  # noqa: BLE001
-            return False
-        # A CAPTCHA frame is a real block regardless of text.
-        try:
-            if await page.locator('iframe[title*="captcha" i], iframe[src*="captcha" i]').count():
-                return True
-        except Exception:  # noqa: BLE001
+            captcha = await page.locator(
+                'iframe[title*="captcha" i], iframe[src*="captcha" i]'
+            ).count()
+            if captcha > 0:
+                raise RateLimitError(
+                    "CAPTCHA challenge detected. Manual intervention required.",
+                    suggested_wait_time=3600,
+                )
+        except RateLimitError:
+            raise
+        except Exception:  # noqa: BLE001 - a missing frame is not a block
             pass
-        return any(m in visible for m in markers)
+        try:
+            body = await page.locator("body").inner_text(timeout=2000)
+        except Exception:  # noqa: BLE001 - an unreadable body is not a block
+            return
+        lowered = (body or "").lower()
+        if any(phrase in lowered for phrase in _RATE_LIMIT_PHRASES):
+            raise RateLimitError(
+                "Rate limit message visible on the page.", suggested_wait_time=1800
+            )
 
+    patched: list[str] = []
     utils.detect_rate_limit = detect_rate_limit
-    for mod_name in ("linkedin_scraper.scrapers.base", "linkedin_scraper.scrapers.person",
-                     "linkedin_scraper.scrapers.company"):
-        mod = sys.modules.get(mod_name)
-        if mod is not None and hasattr(mod, "detect_rate_limit"):
+    patched.append("linkedin_scraper.core.utils")
+
+    # Import each call site so the name exists to overwrite, then rebind it.
+    for mod_name in (
+        "linkedin_scraper.core.auth",
+        "linkedin_scraper.scrapers.base",
+        "linkedin_scraper.scrapers.person",
+        "linkedin_scraper.scrapers.company",
+        "linkedin_scraper.scrapers.job",
+    ):
+        try:
+            mod = importlib.import_module(mod_name)
+        except ImportError:
+            continue
+        if hasattr(mod, "detect_rate_limit"):
             mod.detect_rate_limit = detect_rate_limit
-    return True
+            patched.append(mod_name)
+    return patched
 
 
 def _playwright():
@@ -169,7 +221,20 @@ async def _authenticate(context, page) -> str:
         await context.add_cookies(
             [{"name": "li_at", "value": li_at, "domain": ".linkedin.com", "path": "/"}]
         )
-    await page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded")
+    try:
+        await page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded")
+    except Exception as exc:  # noqa: BLE001
+        # A malformed or expired li_at makes LinkedIn bounce between /feed and
+        # /login until the browser gives up. The raw ERR_TOO_MANY_REDIRECTS says
+        # nothing useful, so name the actual cause.
+        if "ERR_TOO_MANY_REDIRECTS" in str(exc):
+            raise RuntimeError(
+                "LinkedIn redirect loop, which means the li_at cookie is malformed, "
+                "expired, or bound to a different browser fingerprint. Prefer "
+                "LINKEDIN_PROFILE_DIR with a session created on this machine — see "
+                "docs/LINKEDIN.md."
+            ) from None
+        raise RuntimeError(f"could not reach LinkedIn: {exc}") from None
     url = page.url
     if "/checkpoint" in url or "/challenge" in url:
         raise RuntimeError(
