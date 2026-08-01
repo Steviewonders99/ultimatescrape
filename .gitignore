@@ -1,0 +1,24 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Run artifacts: checkpoints, raw agent output, reports.
+runs/*
+!runs/.gitkeep
+
+# Never commit browser session state — it contains live LinkedIn cookies.
+.sessions/
+*.storage_state.json
+
+# Knowledge graph — local capture store, machine-specific
+knowledge/*
+!knowledge/.gitkeep

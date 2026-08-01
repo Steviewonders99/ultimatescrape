@@ -1,0 +1,96 @@
+# UltimateScrape project configuration.
+#
+# This file is the repo user's control panel. Everything here is optional and
+# has a working default; anything set as an environment variable wins over what
+# is written here, so CI and one-off overrides do not require editing the file.
+#
+# Copy, edit, commit. It is meant to be checked in — keep secrets in .env.
+
+[output]
+# Which artifacts every run produces. Order does not matter.
+# Available: markdown, json, jsonl, csv, xlsx, html, mermaid
+formats = ["markdown", "json", "csv"]
+
+# Where finished artifacts are written, relative to the repo root.
+directory = "runs"
+
+# Naming for exported files. Available fields: {run_id} {topic} {date} {format}
+filename_template = "{run_id}"
+
+# Emit an index.md per run listing every artifact produced.
+write_index = true
+
+[output.markdown]
+# Refuted findings are kept by default. A refuted finding is evidence about the
+# topic AND about the swarm; dropping them hides both.
+include_refuted = true
+include_unverified = true
+include_gaps = true
+include_method = true
+max_rows_per_section = 60
+
+[output.csv]
+delimiter = ","
+# Provenance columns (_verdict, _corroborations, _url_status). Turning these off
+# produces a tidier sheet that no longer says which rows were checked.
+include_provenance = true
+
+[output.xlsx]
+freeze_header = true
+autofilter = true
+# One sheet per verdict (verified / unverified / refuted) instead of one flat sheet.
+split_by_verdict = true
+
+[output.html]
+# Self-contained single file — no external CSS or JS.
+standalone = true
+theme = "auto"          # auto | light | dark
+
+[graph]
+# Local knowledge graph. Accumulates entities and relations across runs so the
+# second question about a company is cheaper than the first.
+enabled = true
+path = "knowledge/graph.db"
+# Ingest every completed run automatically. Turn off to ingest manually.
+auto_ingest = true
+# Use an LLM to pull entities and relations out of findings. Costs roughly one
+# cheap call per 20 findings. With this off, only the structural relations that
+# can be derived deterministically are recorded.
+llm_extraction = true
+# Similarity threshold for merging two entities into one (0-1).
+merge_threshold = 0.88
+
+[sharepoint]
+# Publishing finalised documents. Disabled by default: uploading is outward-facing
+# and should be a deliberate act, not a side effect of finishing a run.
+enabled = false
+site_host = "yourtenant.sharepoint.com"
+site_path = "/sites/YourSite"
+folder = "Active Projects/Research/UltimateScrape"
+# Which formats get uploaded. Usually a readable subset, not everything.
+upload_formats = ["markdown", "xlsx"]
+# Refuse to overwrite an existing file of the same name.
+conflict = "rename"     # rename | replace | fail
+
+[ga4]
+# Analytics reporting for the market research team.
+enabled = true
+# Default property when --property is not passed. Find yours with `uscrape ga4 properties`.
+default_property = "123456789"
+default_lookback_days = 28
+
+[swarm]
+# Defaults for every run; CLI flags still win.
+verifier_votes = 3
+validate_urls = true
+synthesize = true
+
+[linkedin]
+# Tier order. "parser" is deliberately absent — read docs/LINKEDIN.md before adding it.
+tiers = ["vendor", "mcp", "jina"]
+
+[jobboards]
+# Competitor and job-board monitoring. Platforms resolve through the ATS
+# registry, so most need no per-site scraping at all.
+watch = ["scale", "appen", "handshake", "surge", "mercor", "toloka", "prolific"]
+include_worker_platforms = true

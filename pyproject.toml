@@ -1,0 +1,49 @@
+[project]
+name = "ultimatescrape"
+version = "0.1.0"
+description = "Swarm research + scraping engine. Fans out large fleets of Kimi K2.6 agents across the web, LinkedIn, and national statistics APIs."
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "pydantic>=2.7",
+    "typer>=0.12",
+    "rich>=13.7",
+    "selectolax>=0.3.21",
+    "tenacity>=8.3",
+    "brotli>=1.1",
+]
+
+[project.optional-dependencies]
+# The headless-browser crawl tier. Heavy (pulls Playwright + Patchright).
+# Install with: uv pip install -e ".[crawl]" && crawl4ai-setup
+crawl = ["crawl4ai>=0.9.2"]
+dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "ruff>=0.5"]
+export = ["openpyxl>=3.1"]
+
+[project.scripts]
+uscrape = "ultimatescrape.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ultimatescrape"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+# B008: typer's entire API is Option()/Argument() in defaults.
+# S110/S112: the try/except pass sites are deliberate fail-open paths — a
+#   malformed robots.txt, an unparseable JSON-LD block, or a driver that will
+#   not quit must never abort a run.
+# PYI034: __aenter__ returning the concrete class is intentional and readable.
+# EXE001: the LinkedIn worker is invoked as `python worker.py`, never executed.
+ignore = ["B008", "S110", "S112", "PYI034", "EXE001"]
