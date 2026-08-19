@@ -100,8 +100,12 @@ class LiveRun:
     started_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     events: deque = field(default_factory=lambda: deque(maxlen=400))
+    # Live ledger reference so cost keeps ticking through verification and
+    # synthesis, which emit no per-unit progress events.
+    ledger: Ledger | None = field(default=None, repr=False)
 
     def snapshot(self) -> dict:
+        cost = self.ledger.cost_usd if self.ledger else self.cost_usd
         return {
             "run_id": self.run_id,
             "kind": self.kind,
@@ -110,7 +114,7 @@ class LiveRun:
             "stage": self.stage,
             "done": self.done,
             "total": self.total,
-            "cost_usd": round(self.cost_usd, 4),
+            "cost_usd": round(max(cost, self.cost_usd), 4),
             "error": self.error,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
@@ -183,6 +187,7 @@ class RunManager:
                 live.stage = "done"
 
         ledger = Ledger(limit_usd=max_cost_usd) if max_cost_usd else Ledger()
+        live.ledger = ledger
         try:
             async with Swarm(store=store, ledger=ledger, progress=progress) as swarm:
                 result = await swarm.run(spec, resume=resume, synthesize=synthesize)
@@ -261,10 +266,13 @@ def _build_spec(req: SwarmRequest) -> SwarmSpec:
 def _estimate(spec: SwarmSpec, verify: bool) -> dict:
     agents = len(spec.work_units())
     base = agents * COST_PER_AGENT_USD
-    # Verification adds one call per lens per finding and is usually the larger
-    # number (skill doc). We cannot know the finding count up front, so give a
-    # band rather than fake precision.
-    low, high = (base, base * 3.0) if verify else (base, base * 1.2)
+    # Verification is one call per lens per finding and dominates: it scales
+    # with findings found (~8/agent × 3 lenses), not with agents. Calibrated on
+    # the 2026-08-19 Appen run: 8 agents, $0.67 research, $8.85 total.
+    if verify:
+        low, high = base + agents * 0.4, base * 1.2 + agents * 1.6
+    else:
+        low, high = base, base * 1.2
     return {
         "agents": agents,
         "targets": len(spec.targets),
