@@ -27,6 +27,9 @@ linkedin = ["linkedin-scraper>=3.1.2", "patchright>=1.49"]
 dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "ruff>=0.5"]
 export = ["openpyxl>=3.1"]
 
+# The local HTTP bridge behind the onetake dashboard (`uscrape serve`).
+server = ["fastapi>=0.115", "uvicorn[standard]>=0.30"]
+
 [project.scripts]
 uscrape = "ultimatescrape.cli:app"
 

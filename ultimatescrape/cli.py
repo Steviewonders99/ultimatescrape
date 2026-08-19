@@ -1,14 +1,14 @@
 """Command line interface.
 
-    uscrape doctor                          which backends and data sources are live
-    uscrape fetch <url> [...]               fetch pages as markdown
-    uscrape linkedin <url> [...]            resolve LinkedIn URLs through the tier chain
-    uscrape company "Acme" "Globex"         company-intelligence swarm
-    uscrape market "United States" -t "..." market-research swarm
-    uscrape vendor -c US -c BR -p "..."     supplier-sourcing swarm
-    uscrape resume <run_id>                 finish an interrupted run
-    uscrape sources [--protocol pxweb]      browse the statistics-API catalog
-    uscrape census --vars B01003_001E       query the US Census directly
+uscrape doctor                          which backends and data sources are live
+uscrape fetch <url> [...]               fetch pages as markdown
+uscrape linkedin <url> [...]            resolve LinkedIn URLs through the tier chain
+uscrape company "Acme" "Globex"         company-intelligence swarm
+uscrape market "United States" -t "..." market-research swarm
+uscrape vendor -c US -c BR -p "..."     supplier-sourcing swarm
+uscrape resume <run_id>                 finish an interrupted run
+uscrape sources [--protocol pxweb]      browse the statistics-API catalog
+uscrape census --vars B01003_001E       query the US Census directly
 """
 
 from __future__ import annotations
@@ -111,7 +111,9 @@ def doctor(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
         table.add_row("models", " → ".join(settings.models))
         table.add_row("api key", "[green]set[/]" if settings.api_key else "[red]MISSING[/]")
         table.add_row("budget ceiling", f"${settings.max_run_cost_usd:.2f}/run")
-        table.add_row("concurrency", f"{settings.llm_concurrency} llm / {settings.fetch_concurrency} fetch")
+        table.add_row(
+            "concurrency", f"{settings.llm_concurrency} llm / {settings.fetch_concurrency} fetch"
+        )
         console.print(table)
 
         if settings.api_key:
@@ -192,9 +194,7 @@ def fetch(
                     console.print(f"    {line[:110]}", style="dim")
 
         if out:
-            out.write_text(
-                json.dumps([r.as_dict() for r in results], indent=2, ensure_ascii=False)
-            )
+            out.write_text(json.dumps([r.as_dict() for r in results], indent=2, ensure_ascii=False))
             console.print(f"\nwrote {out}")
 
     asyncio.run(main())
@@ -319,12 +319,9 @@ def resume(
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    pending = store.pending(
-        [spec.unit_key(t, d) for t, d in spec.work_units()]
-    )
+    pending = store.pending([spec.unit_key(t, d) for t, d in spec.work_units()])
     console.print(
-        f"[bold]{store.run_id}[/] — {len(pending)} of {len(spec.work_units())} agents "
-        f"still to run"
+        f"[bold]{store.run_id}[/] — {len(pending)} of {len(spec.work_units())} agents still to run"
     )
     if not pending:
         console.print(
@@ -590,7 +587,10 @@ def graph_show(
         table.add_column(col)
     for edge in edges[:60]:
         table.add_row(
-            edge["source"][:34], edge["relation"][:22], edge["target"][:34], str(int(edge["weight"]))
+            edge["source"][:34],
+            edge["relation"][:22],
+            edge["target"][:34],
+            str(int(edge["weight"])),
         )
     console.print(table)
 
@@ -652,9 +652,11 @@ def graph_ingest(
     if store is None:
         raise typer.BadParameter("no runs found")
     manifest = store.read_manifest()
-    findings = json.loads((store.root / "findings.json").read_text()).get("findings", []) if (
-        store.root / "findings.json"
-    ).exists() else []
+    findings = (
+        json.loads((store.root / "findings.json").read_text()).get("findings", [])
+        if (store.root / "findings.json").exists()
+        else []
+    )
     result = SwarmResult(
         run_id=store.run_id,
         spec=manifest.get("spec", {}),
@@ -841,7 +843,9 @@ def ga4_fields(
 @app.command()
 def publish(
     target: str = typer.Argument("latest", help="Run id, 'latest', or a directory path"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Check access and report, upload nothing"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Check access and report, upload nothing"
+    ),
     subfolder: str = typer.Option("", "--subfolder", help="Folder beneath the configured root"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
@@ -873,7 +877,9 @@ def publish(
             console.print(f"[red]{report['error']}[/]")
             raise typer.Exit(1)
 
-        destination = f"{report.get('site', '?')}/{cfg.folder}" + (f"/{subfolder}" if subfolder else "")
+        destination = f"{report.get('site', '?')}/{cfg.folder}" + (
+            f"/{subfolder}" if subfolder else ""
+        )
         console.print(f"[bold]destination[/] {destination}")
         console.print(f"[bold]formats[/]     {', '.join(cfg.upload_formats)}")
 
@@ -891,3 +897,22 @@ def publish(
             console.print(f"{mark} {result.name} {result.web_url or result.error or ''}")
 
     asyncio.run(main())
+
+
+@app.command()
+def serve(
+    host: str = typer.Option(
+        "127.0.0.1", help="Bind address. Keep on loopback unless you know why."
+    ),
+    port: int = typer.Option(8791, help="Port for the bridge API."),
+    reload: bool = typer.Option(False, help="Auto-reload on code changes (development)."),
+) -> None:
+    """Run the local HTTP bridge that the onetake dashboard talks to."""
+    try:
+        from .server import main as serve_main
+    except ImportError as exc:  # fastapi/uvicorn are the [server] extra
+        console.print(f"[red]server dependencies missing ({exc}) — run:[/]")
+        console.print('  uv pip install -e ".[server]"')
+        raise typer.Exit(1) from exc
+    console.print(f"[bold]UltimateScrape bridge[/] on http://{host}:{port}  (docs at /api/docs)")
+    serve_main(host=host, port=port, reload=reload)
