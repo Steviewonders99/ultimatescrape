@@ -27,6 +27,10 @@ _DEFAULT_FALLBACKS: tuple[str, ...] = ()
 
 def _load_env() -> None:
     load_dotenv(Path.cwd() / ".env", override=False)
+    # Also the checkout's own .env, so `uscrape` behaves the same from any cwd
+    # (an editable install launched outside the repo used to silently lose
+    # every key and extension configured there).
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
     raw = os.getenv("USCRAPE_ENV_FALLBACKS")
     paths = raw.split(os.pathsep) if raw else _DEFAULT_FALLBACKS
     for p in paths:

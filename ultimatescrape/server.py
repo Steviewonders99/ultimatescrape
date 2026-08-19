@@ -666,6 +666,36 @@ async def run_export(run_id: str, format: str = "xlsx") -> FileResponse:
     return FileResponse(real[0], filename=real[0].name)
 
 
+def _load_extensions() -> None:
+    """Mount private extension modules listed in USCRAPE_EXTENSIONS.
+
+    Each entry (``os.pathsep``-separated) is a path to a Python file exposing
+    ``register(app)``. This keeps deployment-specific surfaces — internal data
+    sources, company-specific analysis — out of this repository while letting
+    them ride the same bridge process, auth, and CORS policy.
+    """
+    import importlib.util
+
+    for raw in os.getenv("USCRAPE_EXTENSIONS", "").split(os.pathsep):
+        raw = raw.strip()
+        if not raw:
+            continue
+        path = Path(raw).expanduser()
+        try:
+            spec = importlib.util.spec_from_file_location(path.stem, path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"cannot load {path}")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            module.register(app)
+            log.info("extension mounted: %s", path)
+        except Exception:
+            log.exception("extension failed to load: %s", path)
+
+
+_load_extensions()
+
+
 def main(host: str = "127.0.0.1", port: int = 8791, reload: bool = False) -> None:
     import uvicorn
 
