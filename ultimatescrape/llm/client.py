@@ -153,6 +153,7 @@ class KimiClient:
         temperature: float = 0.3,
         label: str = "agent",
         models: list[str] | None = None,
+        reasoning: dict | None = None,
     ) -> Completion:
         """One chat completion, walking the model chain until something works."""
         messages: list[dict] = []
@@ -177,6 +178,7 @@ class KimiClient:
                             temperature=temperature,
                             attempt=attempt,
                             label=label,
+                            reasoning=reasoning,
                         )
                     except BudgetExceeded:
                         raise  # a spend ceiling is never retryable
@@ -266,6 +268,7 @@ class KimiClient:
         temperature: float,
         attempt: int,
         label: str,
+        reasoning: dict | None = None,
     ) -> Completion:
         payload: dict[str, Any] = {
             "model": model,
@@ -273,6 +276,10 @@ class KimiClient:
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
+        if reasoning is not None:
+            # OpenRouter reasoning control — heavy thinkers (kimi-k3) otherwise
+            # burn the whole max_tokens budget before emitting content.
+            payload["reasoning"] = reasoning
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
         if grounded:
