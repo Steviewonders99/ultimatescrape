@@ -71,8 +71,11 @@ def _env_list(name: str, default: str = "") -> list[str]:
 PRICE_PER_MTOK: dict[str, tuple[float, float]] = {
     "moonshotai/kimi-k2.6": (0.60, 2.50),
     "moonshotai/kimi-k2.5": (0.60, 2.50),
-    "moonshotai/kimi-k2.7-code": (0.68, 3.41),
+    "moonshotai/kimi-k2.7-code": (0.71, 3.50),
     "moonshotai/kimi-k2": (0.60, 2.50),
+    "qwen/qwen3.8-max": (2.00, 6.00),
+    "qwen/qwen3.8-2.4t-a95b": (2.00, 6.00),
+    "qwen/qwen3.8-27b": (0.45, 3.20),
     "google/gemma-4-31b-it": (0.10, 0.30),
     "anthropic/claude-haiku-4.5": (0.80, 4.00),
     "anthropic/claude-sonnet-4.6": (3.00, 15.00),
