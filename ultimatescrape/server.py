@@ -391,8 +391,12 @@ JOBS_FILTER_CONTRACT = """Return ONLY a JSON object:
 Rules: keywords are lowercase substrings likely to appear in listing titles or
 descriptions (e.g. "transcription", "annotation", "rater"). countries are terms
 as they appear in location strings — include common variants for each country
-named (e.g. "united states", "usa", "us"). Only set booleans the query clearly
-implies. Leave lists empty rather than guessing."""
+named (e.g. "united states", "usa", "us"). When the query names a REGION
+(Europe, Nordics, LATAM, APAC, Gulf, EU...), expand it into the individual
+country names that appear in locations — never emit the region word itself,
+it matches nothing (e.g. "nordics" -> "denmark", "sweden", "norway",
+"finland", "iceland"). Only set booleans the query clearly implies. Leave
+lists empty rather than guessing."""
 
 
 async def parse_jobs_query(query: str) -> dict:
