@@ -224,6 +224,9 @@ class JobsRequest(BaseModel):
     platforms: list[str] = Field(default_factory=list)
     pay_only: bool = False
     gigs_only: bool = False
+    #: Natural-language filter — parsed by the default LLM chain into title /
+    #: project-type / requirement keywords and country terms, applied server-side.
+    query: str = Field(default="", max_length=600)
 
 
 class GA4RunRequest(BaseModel):
@@ -374,24 +377,113 @@ async def platforms() -> dict:
     }
 
 
-@app.post("/api/jobs", dependencies=[Depends(_auth)])
-async def jobs(req: JobsRequest) -> dict:
-    keys = req.platforms or [p.key for p in jb_registry.PLATFORMS if p.access.value != "browser"]
+JOBS_FILTER_CONTRACT = """Return ONLY a JSON object:
+{
+ "title_keywords": [""],
+ "project_types": [""],
+ "requirements": [""],
+ "countries": [""],
+ "exclude_keywords": [""],
+ "remote_only": false,
+ "pay_only": false,
+ "gigs_only": false
+}
+Rules: keywords are lowercase substrings likely to appear in listing titles or
+descriptions (e.g. "transcription", "annotation", "rater"). countries are terms
+as they appear in location strings — include common variants for each country
+named (e.g. "united states", "usa", "us"). Only set booleans the query clearly
+implies. Leave lists empty rather than guessing."""
+
+
+async def parse_jobs_query(query: str) -> dict:
+    """One LLM call turning a natural-language ask into listing filters."""
+    async with KimiClient() as llm:
+        data, _ = await llm.complete_json(
+            f'Turn this job-search request into listing filters.\n\n"{query}"\n\n{JOBS_FILTER_CONTRACT}',
+            system="You translate recruiter search requests into precise keyword filters.",
+            max_tokens=2000,
+            temperature=0.0,
+            label="jobs-filter",
+        )
+    return data if isinstance(data, dict) else {}
+
+
+def apply_jobs_filters(rows: list[dict], pf: dict) -> list[dict]:
+    def blob(r: dict) -> str:
+        return " ".join(
+            str(r.get(k) or "") for k in ("title", "department", "description_excerpt", "employment_type")
+        ).lower()
+
+    def loc(r: dict) -> str:
+        return str(r.get("location") or "").lower()
+
+    kws = [k.lower() for k in (pf.get("title_keywords") or []) + (pf.get("project_types") or [])
+           + (pf.get("requirements") or []) if k]
+    if kws:
+        rows = [r for r in rows if any(k in blob(r) or k in str(r.get("title") or "").lower() for k in kws)]
+    excl = [k.lower() for k in pf.get("exclude_keywords") or [] if k]
+    if excl:
+        rows = [r for r in rows if not any(k in blob(r) for k in excl)]
+    countries = [c.lower() for c in pf.get("countries") or [] if c]
+    if countries:
+        import re as _re
+
+        def country_hit(r: dict) -> bool:
+            location = loc(r)
+            for c in countries:
+                # Short codes ("us", "uk", "in") substring-match everything —
+                # "in" would match Indonesia — so they must land on word bounds.
+                if len(c) <= 3:
+                    if _re.search(rf"\b{_re.escape(c)}\b", location):
+                        return True
+                elif c in location:
+                    return True
+            return False
+
+        rows = [r for r in rows if country_hit(r)]
+    if pf.get("remote_only"):
+        rows = [r for r in rows if r.get("remote")]
+    if pf.get("pay_only"):
+        rows = [r for r in rows if r.get("pay_min") is not None or r.get("pay_max") is not None]
+    if pf.get("gigs_only"):
+        rows = [r for r in rows if r.get("worker_gig")]
+    return rows
+
+
+async def fetch_filtered_jobs(
+    platforms: list[str], *, pay_only: bool, gigs_only: bool, query: str
+) -> tuple[list[dict], list[str], dict]:
+    keys = platforms or [p.key for p in jb_registry.PLATFORMS if p.access.value != "browser"]
     bad = [k for k in keys if k not in jb_registry.BY_KEY]
     if bad:
         raise HTTPException(422, f"unknown platforms: {', '.join(bad)}")
     async with JobBoardClient() as client:
         listings = await client.fetch_many(keys)
     rows = [l.as_dict() for l in listings]
-    if req.pay_only:
+    if pay_only:
         rows = [r for r in rows if r["pay_min"] is not None or r["pay_max"] is not None]
-    if req.gigs_only:
+    if gigs_only:
         rows = [r for r in rows if r["worker_gig"]]
+    parsed: dict = {}
+    if query.strip():
+        if not settings.api_key:
+            raise HTTPException(409, "natural-language filtering needs the research key — run `uscrape doctor`")
+        parsed = await parse_jobs_query(query.strip())
+        rows = apply_jobs_filters(rows, parsed)
+    return rows, keys, parsed
+
+
+@app.post("/api/jobs", dependencies=[Depends(_auth)])
+async def jobs(req: JobsRequest) -> dict:
+    rows, keys, parsed = await fetch_filtered_jobs(
+        req.platforms, pay_only=req.pay_only, gigs_only=req.gigs_only, query=req.query
+    )
     by_platform: dict[str, int] = {}
     for r in rows:
         by_platform[r["platform"]] = by_platform.get(r["platform"], 0) + 1
     return {
         "listings": rows,
+        "parsed_filters": parsed,
         "summary": {
             "total": len(rows),
             "with_pay": sum(
