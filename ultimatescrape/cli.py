@@ -405,6 +405,99 @@ def census(
     asyncio.run(main())
 
 
+@app.command()
+def minwage(
+    countries: list[str] = typer.Argument(..., help="ISO3 (JPN), ISO2 (JP) or locale (ja-JP)"),
+    local: bool = typer.Option(False, "--local", help="Include curated sub-national rates"),
+    benchmark: float | None = typer.Option(
+        None, "--benchmark", "-b", help="Flat USD payment to compare against each minimum"
+    ),
+    minutes: float | None = typer.Option(
+        None, "--minutes", help="Task duration, to compute an implied hourly rate"
+    ),
+    out: Path | None = typer.Option(None, "--out", "-o"),
+) -> None:
+    """Statutory minimum wages per country (live, ILOSTAT) and sub-national.
+
+    Country rows are live API data; --local rows are curated with per-row
+    source and as_of date — treat a stale as_of as a prompt to re-verify.
+    """
+
+    async def main() -> None:
+        from .sources.minwage import MinWageClient, to_iso3
+
+        async with MinWageClient() as client:
+            rows = await client.country(countries)
+            local_rows: list[dict] = []
+            if local:
+                for code in dict.fromkeys(to_iso3(c) for c in countries):
+                    local_rows.extend(await client.local(code))
+            if benchmark is not None:
+                rows = client.benchmark(benchmark, rows, minutes)
+                local_rows = client.benchmark(benchmark, local_rows, minutes)
+
+        table = Table(show_header=True, header_style="bold")
+        cols = ["Country", "Year", "Monthly USD", "Hourly USD", "Type", "USD basis"]
+        if benchmark is not None:
+            cols.append(f"${benchmark:g} covers")
+        table.add_column(cols[0])
+        for col in cols[1:]:
+            table.add_column(col, justify="right")
+        for row in rows:
+            if row.get("statutory") is True:
+                cells = [
+                    row["iso3"],
+                    str(row.get("year", "")),
+                    f"{row.get('monthly_usd', 0):,.0f}" if row.get("monthly_usd") else "?",
+                    f"{row.get('hourly_usd', 0):,.2f}" if row.get("hourly_usd") else "?",
+                    row.get("mw_type", ""),
+                    row.get("usd_basis", ""),
+                ]
+                if benchmark is not None:
+                    mins = row.get("covers_minutes")
+                    cells.append(f"{mins} min" if mins else "?")
+            else:
+                cells = [row["iso3"], "", "", "", f"[yellow]{row.get('note', '')}[/]", ""]
+                if benchmark is not None:
+                    cells.append("n/a")
+            table.add_row(*cells)
+        console.print(table)
+
+        if local_rows:
+            lt = Table(title="Sub-national (curated — check as_of)", header_style="bold")
+            lcols = ["Country", "Region", "Hourly USD", "As of"]
+            if benchmark is not None:
+                lcols.append(f"${benchmark:g} covers")
+            lt.add_column(lcols[0])
+            lt.add_column("Region")
+            for col in lcols[2:]:
+                lt.add_column(col, justify="right")
+            for row in local_rows:
+                cells = [
+                    row["iso3"],
+                    row["region"],
+                    f"{row.get('hourly_usd', 0):,.2f}" if row.get("hourly_usd") else "?",
+                    row.get("as_of", ""),
+                ]
+                if benchmark is not None:
+                    mins = row.get("covers_minutes")
+                    cells.append(f"{mins} min" if mins else "?")
+                lt.add_row(*cells)
+            console.print(lt)
+
+        console.print(
+            "\n[dim]Hourly = monthly / 173.2 h (ILO convention). Country rows: ILOSTAT "
+            "DF_EAR_INEE_CUR_NB. usd_basis fx_today = converted at today's ECB/World Bank "
+            "rate because ILO has not published USD for that year yet.[/]"
+        )
+        if out:
+            payload = {"countries": rows, "local": local_rows}
+            out.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+            console.print(f"wrote {out}")
+
+    asyncio.run(main())
+
+
 if __name__ == "__main__":
     app()
 

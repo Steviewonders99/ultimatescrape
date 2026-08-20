@@ -1,0 +1,51 @@
+{
+  "_readme": "Sub-national statutory minimum wages. No API publishes these anywhere, so each row is curated with its own source URL and as_of date. A stale as_of is a prompt to re-verify against the source, not a fact. rate is in local currency per unit ('hour' | 'day' | 'month'). scope 'national' rows exist where a fresher national figure than ILOSTAT's latest year is known.",
+  "USA": [
+    {"region": "Federal floor", "scope": "national", "rate": 7.25, "unit": "hour", "currency": "USD", "as_of": "2009-07-24", "source": "https://www.dol.gov/agencies/whd/minimum-wage", "note": "unchanged since 2009; ~20 states still at the federal floor"},
+    {"region": "District of Columbia", "scope": "state", "rate": 17.95, "unit": "hour", "currency": "USD", "as_of": "2025-07-01", "source": "https://does.dc.gov/", "note": "highest US jurisdiction; CPI-adjusted each July"},
+    {"region": "Washington state", "scope": "state", "rate": 16.66, "unit": "hour", "currency": "USD", "as_of": "2025-01-01", "source": "https://lni.wa.gov/workers-rights/wages/minimum-wage/", "note": "CPI-adjusted each January"},
+    {"region": "California", "scope": "state", "rate": 16.5, "unit": "hour", "currency": "USD", "as_of": "2025-01-01", "source": "https://www.dir.ca.gov/dlse/faq_minimumwage.htm", "note": "CPI-adjusted each January; some cities higher (West Hollywood, SF)"},
+    {"region": "New York City", "scope": "city", "rate": 17.0, "unit": "hour", "currency": "USD", "as_of": "2026-01-01", "source": "https://dol.ny.gov/minimum-wage-0", "note": "statutory schedule; NYC/LI/Westchester above rest of state"}
+  ],
+  "CAN": [
+    {"region": "Federal (regulated sectors)", "scope": "national", "rate": 17.75, "unit": "hour", "currency": "CAD", "as_of": "2025-04-01", "source": "https://www.canada.ca/en/employment-social-development/programs/employment-standards/minimum-wage.html", "note": "CPI-adjusted each April"},
+    {"region": "Nunavut", "scope": "province", "rate": 19.0, "unit": "hour", "currency": "CAD", "as_of": "2024-01-01", "source": "https://nu-lsco.ca/faq-s", "note": "highest province/territory"},
+    {"region": "Ontario", "scope": "province", "rate": 17.6, "unit": "hour", "currency": "CAD", "as_of": "2025-10-01", "source": "https://www.ontario.ca/document/your-guide-employment-standards-act-0/minimum-wage", "note": "CPI-adjusted each October"},
+    {"region": "Alberta", "scope": "province", "rate": 15.0, "unit": "hour", "currency": "CAD", "as_of": "2018-10-01", "source": "https://www.alberta.ca/minimum-wage", "note": "lowest province, frozen since 2018"}
+  ],
+  "JPN": [
+    {"region": "National weighted average", "scope": "national", "rate": 1121, "unit": "hour", "currency": "JPY", "as_of": "2025-10-01", "source": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/roudoukijun/minimumichiran/", "note": "prefectural system; FY2025 revision effective around Oct 2025"},
+    {"region": "Tokyo", "scope": "prefecture", "rate": 1226, "unit": "hour", "currency": "JPY", "as_of": "2025-10-01", "source": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/roudoukijun/minimumichiran/", "note": "highest prefecture"},
+    {"region": "Lowest prefectures (approx.)", "scope": "prefecture", "rate": 1023, "unit": "hour", "currency": "JPY", "as_of": "2025-10-01", "source": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/roudoukijun/minimumichiran/", "note": "approximate floor of the FY2025 prefectural range"}
+  ],
+  "CHN": [
+    {"region": "Shanghai", "scope": "municipality", "rate": 2740, "unit": "month", "currency": "CNY", "as_of": "2025-07-01", "source": "https://www.mohrss.gov.cn/", "note": "highest monthly standard; province/city system, no national rate"},
+    {"region": "Beijing", "scope": "municipality", "rate": 2540, "unit": "month", "currency": "CNY", "as_of": "2025-09-01", "source": "https://www.mohrss.gov.cn/", "note": "part-time hourly standard is separate (~CNY 27/h)"},
+    {"region": "Shenzhen", "scope": "city", "rate": 2360, "unit": "month", "currency": "CNY", "as_of": "2023-01-01", "source": "https://www.mohrss.gov.cn/", "note": ""},
+    {"region": "Lowest provincial class (approx.)", "scope": "province", "rate": 1690, "unit": "month", "currency": "CNY", "as_of": "2024-01-01", "source": "https://www.mohrss.gov.cn/", "note": "approximate floor of lowest provincial tiers"}
+  ],
+  "THA": [
+    {"region": "Bangkok", "scope": "province", "rate": 372, "unit": "day", "currency": "THB", "as_of": "2025-01-01", "source": "https://www.mol.go.th/en/minimum-wage", "note": "provincial daily-wage system"},
+    {"region": "Highest provinces (Phuket + pilots)", "scope": "province", "rate": 400, "unit": "day", "currency": "THB", "as_of": "2025-01-01", "source": "https://www.mol.go.th/en/minimum-wage", "note": ""},
+    {"region": "Lowest provinces", "scope": "province", "rate": 337, "unit": "day", "currency": "THB", "as_of": "2025-01-01", "source": "https://www.mol.go.th/en/minimum-wage", "note": ""}
+  ],
+  "VNM": [
+    {"region": "Region I (Hanoi, HCMC urban)", "scope": "region", "rate": 4960000, "unit": "month", "currency": "VND", "as_of": "2024-07-01", "source": "https://vanban.chinhphu.vn/ (Decree 74/2024/ND-CP)", "note": "4-region system; ~7% rise agreed for 2026 — re-verify before quoting"},
+    {"region": "Region II", "scope": "region", "rate": 4410000, "unit": "month", "currency": "VND", "as_of": "2024-07-01", "source": "https://vanban.chinhphu.vn/ (Decree 74/2024/ND-CP)", "note": ""},
+    {"region": "Region III", "scope": "region", "rate": 3860000, "unit": "month", "currency": "VND", "as_of": "2024-07-01", "source": "https://vanban.chinhphu.vn/ (Decree 74/2024/ND-CP)", "note": ""},
+    {"region": "Region IV (rural)", "scope": "region", "rate": 3450000, "unit": "month", "currency": "VND", "as_of": "2024-07-01", "source": "https://vanban.chinhphu.vn/ (Decree 74/2024/ND-CP)", "note": ""}
+  ],
+  "IND": [
+    {"region": "National floor wage", "scope": "national", "rate": 178, "unit": "day", "currency": "INR", "as_of": "2019-07-01", "source": "https://labour.gov.in/", "note": "non-binding floor; binding minimums are a state x skill-level matrix varying 3-4x"},
+    {"region": "Delhi (unskilled)", "scope": "state", "rate": 18066, "unit": "month", "currency": "INR", "as_of": "2025-04-01", "source": "https://labour.delhi.gov.in/", "note": "among the highest states; DA-adjusted twice yearly"}
+  ],
+  "BRA": [
+    {"region": "National", "scope": "national", "rate": 1518, "unit": "month", "currency": "BRL", "as_of": "2025-01-01", "source": "https://www.gov.br/trabalho-e-emprego/", "note": "a few states set higher floors (Sao Paulo, Rio, RS)"}
+  ],
+  "KOR": [
+    {"region": "National", "scope": "national", "rate": 10030, "unit": "hour", "currency": "KRW", "as_of": "2025-01-01", "source": "https://www.minimumwage.go.kr/", "note": "KRW 10,320/h agreed for 2026 — re-verify effective date"}
+  ],
+  "GBR": [
+    {"region": "National Living Wage (21+)", "scope": "national", "rate": 12.21, "unit": "hour", "currency": "GBP", "as_of": "2025-04-01", "source": "https://www.gov.uk/national-minimum-wage-rates", "note": "revised each April; check for the 2026-04 uprating"}
+  ]
+}

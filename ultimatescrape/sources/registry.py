@@ -985,7 +985,14 @@ MULTILATERAL = [
             "rather than an empty result, which is unusually helpful. Content "
             "negotiation works: Accept: application/vnd.sdmx.data+json for JSON. For "
             "anything wide, the bulk backend at rplumber.ilo.org/data is far more "
-            "practical than the query API."
+            "practical than the query API. Two /rest/data traps (verified Aug 2026): "
+            "it 403s non-browser User-Agents (structure endpoints do not), and 403s "
+            "keys with many +-joined ref areas — batch to <=~11 countries per call. "
+            "A malformed key (wrong dimension count) also 403s instead of 422ing, and "
+            "multi-country CSV queries silently drop the NOTE_* annotation columns "
+            "that single-country queries include. "
+            "Minimum wage lives in DF_EAR_INEE_CUR_NB (LCU/PPP/USD variants), not "
+            "under an EAR_4MMN id."
         ),
         verified=True,
     ),
