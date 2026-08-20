@@ -37,6 +37,12 @@ _MONEY = re.compile(
 
 _MULTIPLIER = {"k": 1_000, "m": 1_000_000}
 
+#: Pay intervals that only ever appear on crowd/contributor work. Salaried
+#: corporate roles publish yearly figures; a one-time or per-hour/day/task
+#: payment on a mixed board (Appen's Lever board carries both) is a gig even
+#: when the platform-level flag is off.
+_GIG_PAY_UNITS = {"one-time", "hour", "hour-wage", "hourly", "day", "task", "minute"}
+
 
 @dataclass
 class Listing:
@@ -199,6 +205,9 @@ class JobBoardClient:
                 log.warning("[jobs] %s raised: %s", key, batch)
                 continue
             out.extend(batch)
+        for listing in out:
+            if not listing.worker_gig and listing.pay_unit in _GIG_PAY_UNITS:
+                listing.worker_gig = True
         return out
 
     # ── ATS adapters ──────────────────────────────────────────────────────────
