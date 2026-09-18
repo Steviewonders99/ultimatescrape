@@ -250,7 +250,12 @@ class Fetcher:
             done_results.append(
                 FetchResult(url=tasks[task], ok=False, error="cancelled: run deadline")
             )
-        return done_results
+        # Tasks finish out of order. Returning completion order makes a caller
+        # that zips results to requested URLs attach evidence to the wrong page.
+        # Callbacks still fire immediately above; only the final batch is put
+        # back into stable request order.
+        by_url = {result.url: result for result in done_results}
+        return [by_url[url] for url in todo if url in by_url]
 
     async def check_urls(self, urls: Sequence[str]) -> dict[str, str]:
         """Liveness pass over URLs an agent claimed exist.

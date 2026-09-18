@@ -115,16 +115,23 @@ class KimiClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def check_credits(self) -> dict | None:
+    async def check_credits(self, *, strict_auth: bool = False) -> dict | None:
         """Pre-flight balance check. Returns None when the endpoint is unavailable.
 
         Never blocks a run: a billing-endpoint hiccup must not stop research.
-        It logs loudly and lets the caller decide.
+        It logs loudly and lets the caller decide. Authentication failures are
+        different: when ``strict_auth`` is true they abort before a fan-out can
+        turn one bad key into dozens of doomed model calls.
         """
         if not settings.is_openrouter:
             return None
         try:
             r = await self._client.get(f"{self.base_url}/credits", timeout=15.0)
+            if strict_auth and r.status_code in (401, 403):
+                raise LLMError(
+                    f"OpenRouter authentication failed (HTTP {r.status_code}); refresh "
+                    "OPENROUTER_API_KEY before starting the swarm"
+                )
             r.raise_for_status()
             data = r.json().get("data", {})
             total = float(data.get("total_credits") or 0)
@@ -138,7 +145,9 @@ class KimiClient:
                     settings.min_credits_usd,
                 )
             return {"total": total, "usage": used, "remaining": remaining}
-        except Exception as exc:  # noqa: BLE001 - never fatal
+        except LLMError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - network/billing failure is not fatal
             log.warning("credit check unavailable (%s); continuing", exc)
             return None
 

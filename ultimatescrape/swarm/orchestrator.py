@@ -130,7 +130,11 @@ class Swarm:
             topic=spec.topic, spec=spec.as_dict(), status="running", started_at=utcnow()
         )
 
-        credits = await self.llm.check_credits()
+        try:
+            credits = await self.llm.check_credits(strict_auth=True)
+        except LLMError as exc:
+            store.write_manifest(status="failed", finished_at=utcnow(), errors=[{"stage": "preflight", "error": str(exc)}])
+            raise
         if credits:
             log.info("OpenRouter balance: $%.2f remaining", credits["remaining"])
 

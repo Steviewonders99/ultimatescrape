@@ -56,6 +56,7 @@ Two commands work with **no credentials at all** — start there:
 ```bash
 uscrape platforms                              # 18 competitor platforms, and how each is reached
 uscrape jobs -p imerit -p appen --pay-only     # live listings with published pay rates
+uscrape benchmark --crawl-only                 # OneForma + five competitors, Crawl4AI fallback
 ```
 
 Add one key (`OPENROUTER_API_KEY`) and the research engine turns on:
@@ -69,6 +70,7 @@ uscrape resume latest                             # finish an interrupted run, p
 
 uscrape ga4 run geo --days 28                     # engagement by country and city
 uscrape graph show "Scale AI" --provenance        # what we know, and who said it
+uscrape benchmark --research                      # crawl evidence, then run the verifier swarm
 ```
 
 Windows users: run `.\setup.ps1` and see [`ONBOARDING.md`](ONBOARDING.md).
@@ -207,6 +209,25 @@ uscrape platforms          # 18 competitors and how each is reached
 uscrape jobs --pay-only    # only listings with a published rate
 uscrape jobs --gigs        # worker gigs, not corporate roles
 ```
+
+For contributor-funnel, landing-page, SEO and AEO benchmarking, use the
+dedicated workflow:
+
+```bash
+uscrape benchmark --crawl-only
+uscrape benchmark --research
+uscrape benchmark -c appen -c mercor --no-baseline --crawl-only
+```
+
+The default panel is Appen/CrowdGen, iMerit Scholars, DataForce, Surge AI and
+Mercor, with OneForma as the baseline. It fetches official public surfaces with
+HTTP first and uses Crawl4AI only for failures or thin JavaScript shells. Each
+run exports a reusable page corpus plus deterministic CTA, form, field and
+funnel-link signals in Markdown, JSON, CSV and XLSX. `--research` injects those
+captured facts into a seven-dimension swarm; run `uscrape doctor` first because
+the LLM phase requires a working OpenRouter key. Competitor conversion rates are
+not public, so the output reports observable friction proxies and never invents
+CVR benchmarks.
 
 Live as of the last run: iMerit 22/23 listings carry rates, Appen 49/49, Handshake
 121/130, TELUS 54/121. iMerit is the clearest window on geographic rate arbitrage —

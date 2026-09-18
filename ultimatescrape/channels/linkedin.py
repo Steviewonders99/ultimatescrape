@@ -351,9 +351,19 @@ class LinkedInChannel(Channel):
         r = await self._client.get(f"{base}/{url}", headers=headers)
         r.raise_for_status()
         body = r.text.strip()
-        # An auth wall renders as a short "join LinkedIn" stub; that is a miss,
-        # not a hit, and reporting it as success would poison the dataset.
-        if len(body) < 400 or "Sign in to view" in body or "Join LinkedIn" in body:
+        # An auth wall renders as a short "join LinkedIn" stub; that is a miss.
+        # Jina can also return a 200 wrapper around LinkedIn's 404 page, so
+        # reject that explicitly rather than poisoning social metrics.
+        not_found = (
+            "Warning: Target URL returned error 404",
+            "## Page not found",
+        )
+        auth_wall = ("Sign in to view", "Join LinkedIn")
+        if (
+            len(body) < 400
+            or any(marker in body for marker in not_found)
+            or (len(body) < 2_000 and any(marker in body for marker in auth_wall))
+        ):
             return None
         return ChannelResult(
             url=url,

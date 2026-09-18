@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from urllib.parse import urldefrag
 
 from ..config import settings
 from .extract import Extracted, now_iso
@@ -54,6 +55,10 @@ class BrowserOptions:
     js_code: str | None = None
     page_timeout_ms: int = 45_000
     word_count_threshold: int = 10
+    # Keep Crawl4AI's cleaned HTML on the FetchResult for deterministic DOM
+    # analysis (forms, CTA labels, required fields). It is opt-in because a
+    # normal page fetch only needs markdown and retaining HTML can be large.
+    keep_raw: bool = False
 
 
 class BrowserFetcher:
@@ -104,10 +109,16 @@ class BrowserFetcher:
             js_code=opts.js_code,
             session_id=opts.session_id,
             scan_full_page=True,
+            # Browser fetches must honour the same public-crawl boundary as the
+            # HTTP tier. In particular, benchmark crawls should never turn a
+            # requested public onboarding review into a robots bypass.
+            check_robots_txt=True,
+            remove_consent_popups=True,
+            remove_overlay_elements=True,
         )
 
     @staticmethod
-    def _to_result(url: str, res) -> FetchResult:
+    def _to_result(url: str, res, *, keep_raw: bool = False) -> FetchResult:
         if not getattr(res, "success", False):
             return FetchResult(
                 url=url,
@@ -127,8 +138,9 @@ class BrowserFetcher:
         links = getattr(res, "links", None) or {}
         internal = [ln.get("href") for ln in links.get("internal", []) if ln.get("href")]
         external = [ln.get("href") for ln in links.get("external", []) if ln.get("href")]
+        final_url = getattr(res, "redirected_url", None) or getattr(res, "url", url)
         doc = Extracted(
-            url=getattr(res, "url", url),
+            url=final_url,
             title=meta.get("title"),
             description=meta.get("description"),
             markdown=markdown,
@@ -141,15 +153,18 @@ class BrowserFetcher:
             url=url,
             ok=True,
             status=getattr(res, "status_code", 200),
-            final_url=getattr(res, "url", url),
+            final_url=final_url,
             content_type="text/html",
             doc=doc,
             fetched_at=now_iso(),
+            raw=(getattr(res, "cleaned_html", None) or getattr(res, "html", None))
+            if keep_raw
+            else None,
         )
 
     async def fetch(self, url: str) -> FetchResult:
         res = await self._crawler.arun(url=url, config=self._run_config())
-        return self._to_result(url, res)
+        return self._to_result(url, res, keep_raw=self.options.keep_raw)
 
     async def fetch_many(
         self, urls: Sequence[str], *, max_sessions: int = 8, per_host_delay: tuple[float, float] = (1.0, 3.0)
@@ -166,7 +181,26 @@ class BrowserFetcher:
                 rate_limit_codes=[429, 503],
             ),
         )
+        requested = list(urls)
         results = await self._crawler.arun_many(
-            urls=list(urls), config=self._run_config(), dispatcher=dispatcher
+            urls=requested, config=self._run_config(), dispatcher=dispatcher
         )
-        return [self._to_result(getattr(r, "url", ""), r) for r in results]
+        # Crawl4AI's memory dispatcher returns in *completion* order. Mapping by
+        # list position silently attaches pages to the wrong company whenever a
+        # later request finishes first. ``CrawlResult.url`` is the requested URL;
+        # redirects live separately in ``redirected_url``.
+        def key(value: str) -> str:
+            clean, _fragment = urldefrag(value)
+            return clean.rstrip("/")
+
+        by_request = {key(getattr(res, "url", "")): res for res in results}
+        ordered: list[FetchResult] = []
+        for url in requested:
+            res = by_request.get(key(url))
+            if res is None:
+                ordered.append(
+                    FetchResult(url=url, ok=False, error="crawl4ai returned no result for URL")
+                )
+            else:
+                ordered.append(self._to_result(url, res, keep_raw=self.options.keep_raw))
+        return ordered

@@ -13,6 +13,7 @@ from ultimatescrape.llm.budget import BudgetExceeded, Ledger
 from ultimatescrape.llm.json_util import JsonRecoveryError, parse_json_loose
 from ultimatescrape.store.run import RunStore, safe_key
 from ultimatescrape.swarm.merge import dedupe_key, majority_vote, merge_findings, normalize_url
+from ultimatescrape.swarm.recipes import competitor_benchmark
 from ultimatescrape.swarm.spec import Dimension, SwarmSpec, Target
 
 # ── JSON recovery ─────────────────────────────────────────────────────────────
@@ -185,6 +186,27 @@ def test_dimension_render_reports_missing_context_keys():
     dim = Dimension("d", "Research {label} in {sector}")
     with pytest.raises(KeyError, match="sector"):
         dim.render(Target.of("x"), "topic")
+
+
+def test_competitor_benchmark_is_seven_dimensions_per_company():
+    from ultimatescrape.benchmark import resolve_profiles
+
+    profiles = resolve_profiles(["Appen", "Surge AI"], include_oneforma=True)
+    spec = competitor_benchmark(
+        profiles,
+        evidence_by_target={
+            "appen": {"landing": "captured CTA", "all": "captured page"},
+        },
+        verify=1,
+    )
+    assert len(spec.targets) == 3
+    assert len(spec.dimensions) == 7
+    assert len(spec.work_units()) == 21
+    assert spec.verifier_votes == 1
+    appen = next(target for target in spec.targets if target.key == "appen")
+    assert appen.context["landing_evidence"] == "captured CTA"
+    conversion = next(d for d in spec.dimensions if d.key == "conversion_ops")
+    assert "actual conversion rates are private" in conversion.prompt
 
 
 # ── run store ─────────────────────────────────────────────────────────────────

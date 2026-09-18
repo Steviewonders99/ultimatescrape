@@ -271,8 +271,175 @@ def vendor_sourcing(
     )
 
 
+# ── contributor-funnel / SEO / AEO competitive benchmark ────────────────────
+
+BENCHMARK_CONTRACT = """{
+  "findings": [
+    {
+      "competitor": "<company being assessed>",
+      "dimension": "<landing|onboarding|marketplace|social|seo|aeo|conversion_ops>",
+      "observation": "<one specific, falsifiable observation>",
+      "observable_value": "<count, rank, follower level, stage, timing, or null>",
+      "benchmark_implication": "<what OneForma should compare or measure>",
+      "evidence_type": "<first_party_page|official_social|search_result|third_party|inference>",
+      "source_name": "<publisher or platform>",
+      "url": "<source URL actually retrieved>",
+      "captured_at": "<YYYY-MM-DD>",
+      "confidence": "high|medium|low",
+      "caveat": "<what cannot be known from public evidence>"
+    }
+  ],
+  "gaps": "<public evidence that was unavailable, blocked, or private>"
+}"""
+
+BENCHMARK_SYNTHESIS = """Produce an executive competitor benchmark for OneForma.
+Keep three evidence classes visibly separate: (1) directly observed public facts,
+(2) reasonable inferences from those facts, and (3) unavailable private metrics.
+Never invent a competitor conversion rate. Compare observable funnel friction,
+step counts, gating, pay visibility, time-to-value claims, search visibility,
+social reach, and AEO extractability. End with a measurement plan mapping each
+public proxy to the exact first-party OneForma funnel rate needed for a fair
+internal benchmark."""
+
+
+def competitor_benchmark(
+    profiles: list | None = None,
+    *,
+    evidence_by_target: dict[str, dict[str, str]] | None = None,
+    verify: int = 3,
+) -> SwarmSpec:
+    """Deep benchmark for contributor acquisition and onboarding.
+
+    ``profiles`` accepts the central ``CompetitorProfile`` objects from
+    :mod:`ultimatescrape.benchmark`. Importing lazily avoids making the generic
+    swarm recipe module depend on the optional Crawl4AI tier.
+    """
+    if profiles is None:
+        from ..benchmark import resolve_profiles
+
+        profiles = resolve_profiles()
+    crawl = evidence_by_target or {}
+    targets: list[Target] = []
+    for profile in profiles:
+        observed = crawl.get(profile.key, {})
+        targets.append(
+            Target(
+                key=profile.key,
+                label=profile.label,
+                context={
+                    "domain": profile.domain,
+                    "landing_evidence": observed.get("landing", "No Crawl4AI capture supplied."),
+                    "funnel_evidence": observed.get("funnel", "No Crawl4AI capture supplied."),
+                    "onboarding_evidence": observed.get(
+                        "onboarding", "No Crawl4AI capture supplied."
+                    ),
+                    "crawl_evidence": observed.get("all", "No Crawl4AI capture supplied."),
+                    "social_profiles": ", ".join(
+                        f"{platform}: {url}" for platform, url in profile.social_profiles.items()
+                    )
+                    or "No official social profiles catalogued.",
+                },
+            )
+        )
+
+    dimensions = [
+        Dimension(
+            "landing",
+            "Audit {label}'s public contributor landing page on {domain}. Use the Crawl4AI "
+            "capture below as primary evidence, then retrieve the live page to verify material "
+            "claims. Map audience, hero promise, proof, pay transparency, CTA hierarchy, FAQ, "
+            "objection handling, mobile/visual friction, and message match from ad/search intent. "
+            "Count observed CTAs and forms; do not estimate conversion.\n\nCRAWL:\n{landing_evidence}",
+            why="Landing-page message and friction are observable conversion inputs.",
+            max_tokens=7000,
+        ),
+        Dimension(
+            "onboarding",
+            "Reconstruct the current public onboarding funnel for {label}, from first visit to "
+            "first eligible paid work. Identify every evidenced stage, required field, identity "
+            "or phone check, assessment, agreement, payment setup, human review, and wait state. "
+            "Report the minimum observable steps and every unknown; never create an account or "
+            "submit personal data.\n\nCRAWL:\n{onboarding_evidence}",
+            why="Stage/gate inventory is the closest defensible public proxy for onboarding CVR.",
+            max_tokens=8000,
+        ),
+        Dimension(
+            "marketplace",
+            "Assess {label}'s public work marketplace and time-to-value. Check whether jobs can be "
+            "browsed before registration, whether pay/rate/unit/location/capacity are visible, how "
+            "matching works, what qualifications are disclosed, and the stated or implied delay "
+            "between signup, qualification, matching, first task, QA, and payment. Distinguish "
+            "company claims from verified mechanics.\n\nCRAWL:\n{funnel_evidence}",
+            why="Pay visibility and time-to-first-work are major activation levers.",
+            max_tokens=7000,
+        ),
+        Dimension(
+            "social",
+            "Benchmark {label}'s current official social reach. Check the catalogued official "
+            "profiles below and official-site links. For LinkedIn, YouTube, Facebook, Instagram, "
+            "TikTok and X, record the exact visible follower/subscriber count, capture date, last "
+            "post date, posting cadence over the latest 30 days, and median visible engagement "
+            "over the latest 10 non-pinned posts where public. Use null when a platform blocks or "
+            "hides a metric; never infer one follower count from another.\n\nPROFILES:\n{social_profiles}",
+            why="Reach without cadence and engagement is a vanity metric, so all three travel together.",
+            max_tokens=7500,
+        ),
+        Dimension(
+            "seo",
+            "Measure {label}'s live organic-search visibility for this fixed English query panel: "
+            "AI training jobs, data annotation jobs, remote AI jobs, AI data collection company, "
+            "human data platform, and train AI for money. Record search engine, locale, date, "
+            "observed position/range, ranking URL, title, snippet angle, and SERP features. Also "
+            "audit title/H1 alignment, indexability, content depth, internal links and freshness on "
+            "the ranking page. A missing result is a gap, not rank zero.",
+            why="A fixed panel makes future share-of-search runs comparable.",
+            max_tokens=8500,
+        ),
+        Dimension(
+            "aeo",
+            "Audit {label}'s AEO/AI-search readiness and visibility. Check robots.txt access for "
+            "GPTBot, ChatGPT-User, PerplexityBot, ClaudeBot, Google-Extended and Bingbot. Review "
+            "definition blocks, self-contained answers, FAQs, comparison tables, author/date "
+            "signals, original statistics, third-party mentions, and entity consistency. Record "
+            "actual observed citations only when the named AI/search surface exposes them; do not "
+            "call ordinary Google rank an AI citation.\n\nCRAWL:\n{crawl_evidence}",
+            why="Traditional rank and AI citation are related but not interchangeable.",
+            max_tokens=8000,
+        ),
+        Dimension(
+            "conversion_ops",
+            "Translate the public evidence for {label} into an operations benchmark for OneForma. "
+            "List the observable proxy, the exact OneForma first-party metric needed for a fair "
+            "comparison, numerator, denominator, clock start/stop, segmentation, and confounders. "
+            "Cover landing-to-signup, signup completion, profile completion, qualification start "
+            "and pass, application completion, approval, first task, first approved unit, first "
+            "payment, 30-day activation and 90-day retention. Explicitly state that {label}'s "
+            "actual conversion rates are private unless a sourced disclosure exists.",
+            why="Turns competitive observation into an internal measurement contract.",
+            max_tokens=7000,
+        ),
+    ]
+    return SwarmSpec(
+        topic="Contributor onboarding, landing page, social, SEO and AEO benchmark",
+        targets=targets,
+        dimensions=dimensions,
+        system_prompt=RESEARCH_SYSTEM,
+        output_contract=BENCHMARK_CONTRACT,
+        findings_key="findings",
+        dedupe_fields=("competitor", "dimension", "url"),
+        url_fields=("url",),
+        verifier_votes=verify,
+        synthesis_prompt=BENCHMARK_SYNTHESIS,
+        notes=(
+            "Seven dimensions per company. Public evidence supports friction proxies, not private "
+            "competitor conversion rates. Crawl4AI evidence is injected dimension-by-dimension."
+        ),
+    )
+
+
 RECIPES = {
     "company": company_research,
     "market": market_research,
     "vendor": vendor_sourcing,
+    "benchmark": competitor_benchmark,
 }

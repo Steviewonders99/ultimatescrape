@@ -4,7 +4,10 @@ rather than an exception."""
 
 from __future__ import annotations
 
+import asyncio
+
 from ultimatescrape.fetch.extract import extract
+from ultimatescrape.fetch.http import Fetcher, FetchResult
 
 
 def test_markdown_preserves_structure():
@@ -80,3 +83,19 @@ def test_empty_and_malformed_html_do_not_raise():
     for html in ("", "<html>", "<<<>>>", "<html><body></body></html>"):
         doc = extract(html, "https://example.com/")
         assert doc.word_count >= 0
+
+
+async def test_fetch_many_returns_request_order_not_completion_order():
+    fetcher = object.__new__(Fetcher)
+
+    async def fake_fetch(url: str) -> FetchResult:
+        if url.endswith("slow"):
+            await asyncio.sleep(0.01)
+        return FetchResult(url=url, ok=True, status=200)
+
+    fetcher.fetch = fake_fetch
+    rows = await fetcher.fetch_many(["https://example.com/slow", "https://example.com/fast"])
+    assert [row.url for row in rows] == [
+        "https://example.com/slow",
+        "https://example.com/fast",
+    ]

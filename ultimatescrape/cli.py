@@ -6,6 +6,7 @@ uscrape linkedin <url> [...]            resolve LinkedIn URLs through the tier c
 uscrape company "Acme" "Globex"         company-intelligence swarm
 uscrape market "United States" -t "..." market-research swarm
 uscrape vendor -c US -c BR -p "..."     supplier-sourcing swarm
+uscrape benchmark --crawl-only           competitor funnel/SEO/AEO evidence crawl
 uscrape resume <run_id>                 finish an interrupted run
 uscrape sources [--protocol pxweb]      browse the statistics-API catalog
 uscrape census --vars B01003_001E       query the US Census directly
@@ -294,6 +295,96 @@ def vendor(
             no_synth=False,
         )
     )
+
+
+@app.command("benchmark")
+def competitor_benchmark_command(
+    competitor: list[str] = typer.Option(
+        [],
+        "--competitor",
+        "-c",
+        help="Repeatable. Defaults to Appen, iMerit, DataForce, Surge AI and Mercor.",
+    ),
+    baseline: bool = typer.Option(
+        True, "--baseline/--no-baseline", help="Include OneForma as the first-party baseline."
+    ),
+    research: bool = typer.Option(
+        True,
+        "--research/--crawl-only",
+        help="Run the verifier swarm after the Crawl4AI evidence capture.",
+    ),
+    browser: bool = typer.Option(
+        True,
+        "--browser/--http",
+        help="Allow Crawl4AI fallback for JS/thin pages (recommended) or use HTTP only.",
+    ),
+    verify: bool = typer.Option(True, "--verify/--no-verify"),
+    no_synth: bool = typer.Option(False, "--no-synthesis"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Benchmark public onboarding, landing pages, social, SEO and AEO signals."""
+    _setup_logging(verbose)
+
+    async def main() -> None:
+        from .benchmark import crawl_competitor_surfaces, resolve_profiles
+        from .store.run import RunStore
+        from .swarm.recipes import competitor_benchmark
+
+        try:
+            profiles = resolve_profiles(list(competitor) or None, include_oneforma=baseline)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+
+        store = RunStore.create("competitor-funnel-benchmark")
+        console.print(
+            f"[bold]run {store.run_id}[/] — crawling "
+            f"{sum(len(p.surfaces) for p in profiles)} public pages across {len(profiles)} companies"
+        )
+        crawl = await crawl_competitor_surfaces(
+            profiles,
+            directory=store.root / "crawl",
+            use_browser=browser,
+        )
+        ok = sum(1 for row in crawl.rows if row["ok"])
+        console.print(f"[green]crawl complete[/] · {ok}/{len(crawl.rows)} pages retrieved")
+        for path in crawl.paths:
+            console.print(f"  {path}")
+
+        spec = competitor_benchmark(
+            profiles,
+            evidence_by_target=crawl.evidence_by_target,
+            verify=3 if verify else 0,
+        )
+        store.write_manifest(
+            topic=spec.topic,
+            spec=spec.as_dict(),
+            status="crawl_complete" if not research else "research_pending",
+            crawl={
+                "pages_requested": len(crawl.rows),
+                "pages_ok": ok,
+                "backend": "http+crawl4ai-fallback" if browser else "http",
+            },
+        )
+        if not research:
+            console.print(
+                "[yellow]swarm not started[/] · rerun without --crawl-only after LLM auth is healthy"
+            )
+            return
+
+        agents = len(spec.work_units())
+        floor = agents * 0.066
+        console.print(
+            f"[dim]{agents} research agents · estimated research floor ${floor:.2f}; "
+            "adversarial verification adds cost per unique finding[/]"
+        )
+        await _run_spec(
+            spec,
+            resume_id=store.run_id,
+            verify=verify,
+            no_synth=no_synth,
+        )
+
+    asyncio.run(main())
 
 
 @app.command()

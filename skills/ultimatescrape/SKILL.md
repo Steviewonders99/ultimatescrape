@@ -186,6 +186,26 @@ rates**, which only the gig feeds publish.
 .venv/bin/uscrape jobs -p imerit -p appen -f xlsx
 ```
 
+### Contributor-funnel benchmark
+
+Use this for a repeatable landing-page, onboarding, social, SEO, AEO and
+conversion-operations comparison. The default panel is Appen/CrowdGen, iMerit
+Scholars, DataForce, Surge AI and Mercor, with OneForma included as the baseline.
+
+```bash
+.venv/bin/uscrape benchmark --crawl-only
+.venv/bin/uscrape benchmark --research
+.venv/bin/uscrape benchmark -c appen -c mercor --no-baseline --crawl-only
+```
+
+The crawl tier uses HTTP first and Crawl4AI for failed or thin pages, then
+exports the captured pages and deterministic headings, CTA, form, field and
+funnel-link signals. `--research` feeds that evidence into the verifier swarm.
+Run `doctor` first and stop if OpenRouter authentication fails. Never present
+public funnel structure as a competitor conversion rate: those rates are private
+unless a primary source publishes them. Label public facts, inferred friction
+and unavailable metrics separately.
+
 Rate data quality varies by platform and is recorded per listing in `pay_source`:
 `structured` came from a dedicated field, `parsed` was extracted from prose. When
 reporting rates to the user, say which. Rates without a `pay_unit` were refused
