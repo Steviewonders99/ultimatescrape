@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Swarm research + scraping engine. Fans out large fleets of Kimi K2.6 agents across the web, LinkedIn, and national statistics APIs."
 requires-python = ">=3.11"
 dependencies = [
+    "asyncpg>=0.29",
     "httpx>=0.27",
     "python-dotenv>=1.0",
     "pydantic>=2.7",
