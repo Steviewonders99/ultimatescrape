@@ -31,3 +31,19 @@ def test_proxy_secret_resolution(monkeypatch, tmp_path):
     envfile.write_text("PROXY_SECRET=shh\n")
     monkeypatch.setattr(config, "ENV_LOCAL", envfile)
     assert config.proxy_secret() == "shh"
+
+
+def test_proxy_secret_db_fallback(monkeypatch, tmp_path):
+    monkeypatch.delenv("ONETAKE_PROXY_SECRET", raising=False)
+    envfile = tmp_path / ".env.local"
+    envfile.write_text("DB_PROXY_SECRET=shh2\n")
+    monkeypatch.setattr(config, "ENV_LOCAL", envfile)
+    assert config.proxy_secret() == "shh2"
+
+
+def test_proxy_secret_precedence(monkeypatch, tmp_path):
+    monkeypatch.delenv("ONETAKE_PROXY_SECRET", raising=False)
+    envfile = tmp_path / ".env.local"
+    envfile.write_text("PROXY_SECRET=preferred\nDB_PROXY_SECRET=fallback\n")
+    monkeypatch.setattr(config, "ENV_LOCAL", envfile)
+    assert config.proxy_secret() == "preferred"

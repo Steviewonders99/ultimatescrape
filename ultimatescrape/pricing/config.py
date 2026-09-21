@@ -37,10 +37,14 @@ def proxy_base() -> str:
 
 
 def proxy_secret() -> str:
-    sec = os.getenv("ONETAKE_PROXY_SECRET") or _from_env_local("PROXY_SECRET")
+    sec = (
+        os.getenv("ONETAKE_PROXY_SECRET")
+        or _from_env_local("PROXY_SECRET")
+        or _from_env_local("DB_PROXY_SECRET")
+    )
     if not sec:
         raise RuntimeError(
             "proxy secret missing: set ONETAKE_PROXY_SECRET or provide "
-            f"PROXY_SECRET in {ENV_LOCAL}"
+            f"PROXY_SECRET or DB_PROXY_SECRET in {ENV_LOCAL}"
         )
     return sec
