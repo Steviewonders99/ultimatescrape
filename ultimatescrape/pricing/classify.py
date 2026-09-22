@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import asyncpg
 
 TAXONOMY_VERSION = "v1"
-BATCH_SIZE = 20
+BATCH_SIZE = 10
 MODEL_LABEL = "pricing-classify"
 
 SYSTEM = (
@@ -118,7 +118,7 @@ async def classify_new(
         for start in range(0, len(listings), BATCH_SIZE):
             batch = listings[start:start + BATCH_SIZE]
             data, _ = await client.complete_json(
-                build_prompt(batch), system=SYSTEM, max_tokens=4000,
+                build_prompt(batch), system=SYSTEM, max_tokens=8000,
                 temperature=0.0, label=MODEL_LABEL,
             )
             results = parse_response(data if isinstance(data, dict) else {},

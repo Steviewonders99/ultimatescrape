@@ -5,7 +5,7 @@ import pathlib
 import pytest
 
 from tests.pricing.conftest import requires_pg
-from ultimatescrape.pricing import ddl
+from ultimatescrape.pricing import classify, ddl
 from ultimatescrape.pricing.classify import build_prompt, classify_new, parse_response
 
 KEYS = {"llm-eval-rlhf", "search-rating", "corporate-role", "other"}
@@ -141,12 +141,25 @@ async def test_golden_agreement_gate():
     golden = json.loads(GOLDEN.read_text())
     valid = {k for k, _, _ in TAXONOMY_SEED}
     hits = 0
+    finish_reasons: list[str | None] = []
+    # Exercises the PRODUCTION batch size, not a hard-coded one — classify_new
+    # and this gate must always run the same batch shape.
     async with KimiClient() as llm:
-        for start in range(0, len(golden), 20):
-            batch = golden[start:start + 20]
-            data, _ = await llm.complete_json(
-                build_prompt(batch), system=SYSTEM, max_tokens=4000,
+        for start in range(0, len(golden), classify.BATCH_SIZE):
+            batch = golden[start:start + classify.BATCH_SIZE]
+            data, meta = await llm.complete_json(
+                build_prompt(batch), system=SYSTEM, max_tokens=8000,
                 temperature=0.0, label="pricing-classify-golden")
+            finish_reasons.append(getattr(meta, "finish_reason", None))
             for g, r in zip(batch, parse_response(data, len(batch), valid)):
                 hits += r["market_type"] == g["expected"]
+
+    truncated = [fr for fr in finish_reasons if fr == "length"]
+    print(f"\nfinish_reasons per batch: {finish_reasons}")
+    print(f"golden agreement: {hits}/{len(golden)} = {hits / len(golden):.1%}")
+    assert not truncated, (
+        f"model truncated {len(truncated)}/{len(finish_reasons)} batches "
+        f"(finish_reason='length') — accuracy numbers below are not trustworthy "
+        f"until this clears: {finish_reasons}"
+    )
     assert hits / len(golden) >= 0.90, f"golden agreement {hits}/{len(golden)}"
