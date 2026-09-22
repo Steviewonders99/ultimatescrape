@@ -238,14 +238,19 @@ async def sync_boards(
                     " WHERE taxonomy_version='v1' AND listing_id = ANY($1)",
                     jd_changed)
             for h in history_rows:
+                # A Python None means "no prior/new pay to record" and must
+                # land as SQL NULL, not a JSONB null scalar — json.dumps(None)
+                # == "null", and "null"::jsonb IS NOT NULL in Postgres, which
+                # would make `WHERE old_pay IS NULL` silently miss these rows.
+                old_pay = None if h["old_pay"] is None else json.dumps(h["old_pay"])
+                new_pay = None if h["new_pay"] is None else json.dumps(h["new_pay"])
                 await conn.execute(
                     "INSERT INTO competitor_listing_history"
                     " (listing_id, observed_at, change_type, old_pay, new_pay, content_hash)"
                     " VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6)"
                     " ON CONFLICT DO NOTHING",
                     h["listing_id"], h["observed_at"], h["change_type"],
-                    json.dumps(h["old_pay"]), json.dumps(h["new_pay"]),
-                    h["content_hash"])
+                    old_pay, new_pay, h["content_hash"])
         await runs.finish(pool, run_id, "ok",
                           rows_inserted=summary["inserted"],
                           rows_updated=summary["updated"] + summary["relisted"],

@@ -29,6 +29,11 @@ async def test_full_lifecycle(pool):
     assert s1["inserted"] == 1
     country = await pool.fetchval("SELECT country_code FROM competitor_listing")
     assert country == "US"
+    # old_pay for a 'new' row must be SQL NULL, not a JSONB null scalar —
+    # WHERE old_pay IS NULL must find it.
+    assert await pool.fetchval(
+        "SELECT old_pay FROM competitor_listing_history"
+        " WHERE change_type='new'") is None
 
     s2 = await sync_boards(pool, platforms=["outlier"],
                            fetch=fake_fetch([L(pay_min=30.0)]))
