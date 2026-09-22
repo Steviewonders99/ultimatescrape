@@ -19,6 +19,8 @@ async def pool():
     finally:
         # Clean up all pricing-related tables between tests
         async with p.acquire() as conn:
+            await conn.execute("DROP VIEW IF EXISTS benchmark_rate_v CASCADE")
+            await conn.execute("DROP TABLE IF EXISTS project_type_map CASCADE")
             await conn.execute("DROP TABLE IF EXISTS competitor_listing_class CASCADE")
             await conn.execute("DROP TABLE IF EXISTS competitor_listing_history CASCADE")
             await conn.execute("DROP TABLE IF EXISTS competitor_listing CASCADE")
