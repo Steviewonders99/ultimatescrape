@@ -32,7 +32,7 @@ async def load_fx(cache_path: Path) -> FxTable:
                 as_of=date.fromisoformat(cached["as_of"]),
                 to_usd=cached["to_usd"],
             )
-    async with httpx.AsyncClient(timeout=30) as http:
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as http:
         resp = await http.get(FRANKFURTER)
         resp.raise_for_status()
         data = resp.json()
