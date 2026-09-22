@@ -3,7 +3,7 @@ import pytest
 from tests.pricing.conftest import requires_pg
 from ultimatescrape.jobboards.fetchers import Listing
 from ultimatescrape.pricing import ddl
-from ultimatescrape.pricing.sync_boards import sync_boards
+from ultimatescrape.pricing.sync_boards import _assert_text_fields, sync_boards
 
 
 def L(ext="a1", pay_min=25.0, title="Rater", desc="desc"):
@@ -82,3 +82,20 @@ async def test_dry_run_writes_nothing(pool):
     assert await pool.fetchval("SELECT count(*) FROM sync_runs") == before
     assert await pool.fetchval(
         "SELECT count(*) FROM competitor_listing WHERE external_id='dry'") == 0
+
+
+def test_text_field_guard_rejects_dict_location():
+    """Defense in depth: a bad adapter (e.g. a future non-outlier shape
+    surprise) must fail with a clear, named error on the apply path — not
+    a bare AttributeError three calls into normalize.country_from_location.
+    No DB needed; this is a pure guard on the Listing object."""
+    l = L(ext="bad")
+    l.location = {"name": "Remote - France"}  # the exact shape seen live
+    with pytest.raises(TypeError, match=r"platform='outlier'.*location.*dict"):
+        _assert_text_fields(l)
+
+
+def test_text_field_guard_allows_none_and_str():
+    l = L(ext="ok")
+    l.department = None  # None is a valid TEXT-column value
+    _assert_text_fields(l)  # must not raise

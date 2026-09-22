@@ -421,7 +421,7 @@ class JobBoardClient:
                     company=p.company,
                     title=job.get("title") or job.get("name", ""),
                     url=job.get("url", "https://app.outlier.ai/en/expert/opportunities"),
-                    location=job.get("location", "") or "remote",
+                    location=_location_text(job.get("location")) or "remote",
                     external_id=str(job.get("id", "")),
                     worker_gig=True,
                     description_excerpt=_strip_html(str(job.get("description", "")), 300),
@@ -590,6 +590,26 @@ def _as_float(value: Any) -> float | None:
         return float(str(value).replace("$", "").replace(",", "").strip())
     except (TypeError, ValueError):
         return None
+
+
+def _location_text(value: Any) -> str:
+    """Extract a human-readable location string from a feed field.
+
+    Most feeds publish location as a plain string. Outlier's job-board API
+    has been observed wrapping it as ``{"name": "Remote - France"}`` instead
+    of a bare string — extract the name rather than let a raw dict reach a
+    TEXT column (or crash normalize.country_from_location downstream with
+    ``'dict' object has no attribute 'lower'``). Any other shape (missing
+    key, non-str name, list, ...) falls back to "" — an honest unknown beats
+    a str(dict) repr masquerading as a location.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        name = value.get("name")
+        if isinstance(name, str):
+            return name
+    return ""
 
 
 def _deep_find_list(node: Any, key: str, depth: int = 0) -> list | None:

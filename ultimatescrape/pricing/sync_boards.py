@@ -82,10 +82,37 @@ def _posted(l: Listing):
         return None
 
 
+#: Listing attributes that must land in a TEXT column. Checked before any
+#: further processing (e.g. normalize.country_from_location) touches them —
+#: an adapter that hands back a dict instead of a string (observed live on
+#: outlier: location={"name": "..."}) must fail loud and specific, not as a
+#: mid-transaction AttributeError three calls downstream.
+_TEXT_FIELDS = (
+    "platform", "company", "external_id", "url", "title", "department",
+    "employment_type", "remote", "location", "description_full",
+    "description_excerpt", "pay_currency", "pay_unit", "pay_raw",
+    "pay_source",
+)
+
+
+def _assert_text_fields(l: Listing) -> None:
+    for field in _TEXT_FIELDS:
+        value = getattr(l, field)
+        if value is not None and not isinstance(value, str):
+            raise TypeError(
+                f"competitor_boards: platform={l.platform!r} "
+                f"external_id={l.external_id!r} field {field!r} is "
+                f"{type(value).__name__}, not str/None: {value!r} — "
+                f"the {l.platform!r} adapter must emit a string; fix it at "
+                "the source, do not coerce here"
+            )
+
+
 def _listing_values(l: Listing, norm: dict, now: datetime) -> dict:
     """Column name -> value for one listing. Single source of truth for the
     column<->value pairing; INSERT and UPDATE both read from this dict by
     name, never by position."""
+    _assert_text_fields(l)
     pay_source = "quarantined" if norm["quarantined"] else l.pay_source
     return {
         "platform": l.platform,
