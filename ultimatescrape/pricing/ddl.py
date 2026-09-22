@@ -120,7 +120,8 @@ TAXONOMY_SEED: list[tuple[str, str, str]] = [
     ("llm-domain-expert-professional", "Domain expert - professional",
      "Law, finance, medicine, accounting or other credentialed-professional AI work."),
     ("coding-eval", "Coding / SWE tasks",
-     "Writing, reviewing or evaluating code for AI training; SWE-bench-style tasks."),
+     ("Writing, reviewing or evaluating code for AI training; SWE-bench-style tasks. "
+      "Production/serving infrastructure engineering (MLOps, deployment) is not this key.")),
     ("search-rating", "Search & ads rating",
      "Search-engine result rating, ads quality rating, relevance evaluation."),
     ("data-annotation", "Data annotation",
@@ -136,14 +137,18 @@ TAXONOMY_SEED: list[tuple[str, str, str]] = [
     ("data-collection-field", "Field data collection",
      "Collecting images, video, documents, receipts or real-world data."),
     ("content-moderation", "Content moderation",
-     "Policy rating, trust & safety review, harmful-content triage."),
+     ("Policy rating, trust & safety review, harmful-content triage on "
+      "human-submitted content.")),
     ("writing-editing", "Writing & editing",
      "Creative writing, prompt writing, copy editing for AI training."),
     ("ai-red-teaming", "AI red-teaming",
-     "Adversarial testing, jailbreak discovery, safety evaluation."),
+     ("Adversarial testing, jailbreak discovery, or teaching a model to safely "
+      "handle sensitive or dangerous topics.")),
     ("corporate-role", "Corporate role (competitor hiring)",
-     "The competitor's own staff hiring - engineering, sales, ops. "
-     "Tracked for intel; excluded from pay benchmarks."),
+     ("The competitor's own staff hiring - engineering, sales, ops running the "
+      "platform itself. Tracked for intel; excluded from pay benchmarks. A "
+      "contractor placed onto a third-party client's team (even via the "
+      "competitor's marketplace) is not this key.")),
     ("other", "Other / unclassifiable",
      "Does not fit any defined market type, or too vague to place."),
 ]

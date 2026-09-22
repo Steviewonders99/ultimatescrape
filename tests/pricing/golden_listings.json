@@ -1,0 +1,364 @@
+[
+  {
+    "title": "AI Response Evaluation Analyst",
+    "platform": "imerit",
+    "location": "Norway",
+    "description_excerpt": "We are looking for detail oriented analysts to evaluate and rank AI generated responses to text based prompts. You will judge answers on accuracy, relevance, clarity, conciseness, safety, localization, and how well they follow the user's instructions, then explain your reasoning in writing. Much of ",
+    "expected": "llm-eval-rlhf"
+  },
+  {
+    "title": "Mexican ChatGPT User",
+    "platform": "mercor",
+    "location": "Remote (Mexico-based only)",
+    "description_excerpt": "**How to Apply — Required First Step** This application includes a short required form, the **ChatGPT Power User Interest Form**. It appears as a step inside the application itself — there is no external link to open. **Applications submitted without this form completed will not be considered.** Ple",
+    "expected": "llm-eval-rlhf"
+  },
+  {
+    "title": "Japanese ChatGPT User",
+    "platform": "mercor",
+    "location": "Remote (Japan-based only)",
+    "description_excerpt": "**How to Apply — Required First Step** This application includes a short required form, the **ChatGPT Power User Interest Form**. It appears as a step inside the application itself — there is no external link to open. **Applications submitted without this form completed will not be considered.** Ple",
+    "expected": "llm-eval-rlhf"
+  },
+  {
+    "title": "AI QA Trainer - LLM Evaluation - Freelance Project",
+    "platform": "invisible",
+    "location": "World Wide - Remote",
+    "description_excerpt": "p Are you an AI QA expert eager to shape the future of AI? Large-scale language models are evolving from clever chatbots into enterprise-grade platforms. With rigorous evaluation data, tomorrow’s AI can democratize world-class education, keep pace with cutting-edge research, and streamline workflows",
+    "expected": "llm-eval-rlhf"
+  },
+  {
+    "title": "Android AI Evaluator - French",
+    "platform": "outlier",
+    "location": "Remote - France",
+    "description_excerpt": "",
+    "expected": "llm-eval-rlhf",
+    "note": "Empty JS-rendered excerpt; title 'AI Evaluator' is the only signal."
+  },
+  {
+    "title": "Voice Conversation Evaluator – English",
+    "platform": "outlier",
+    "location": "Remote - Bangladesh, India",
+    "description_excerpt": "",
+    "expected": "llm-eval-rlhf",
+    "note": "Empty JS-rendered excerpt; 'Evaluator' of AI voice conversations read as rating model output quality."
+  },
+  {
+    "title": "Threat Intel - AI / LLM Trainer - Make Your Own Hours",
+    "platform": "remotasks",
+    "location": "Remote - Non-US",
+    "description_excerpt": "p span style= font-size: 14pt; strong Job Title: /strong AI Response Evaluator for Cyber Security Threat Intelligence /span /p p span style= font-size: 14pt; strong Location: /strong Remote /span /p p span style= font-size: 14pt; strong Job Type: /strong Task-Based Contract (Make your own hours: 5 h",
+    "expected": "llm-eval-rlhf",
+    "note": "Body's real job title is 'AI Response Evaluator for Cyber Security Threat Intelligence' - rating AI answers, not doing threat-intel work itself."
+  },
+  {
+    "title": "Life, Physical & Social Science Expert",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "The research teams behind the best-known AI models come to Mercor for scientific judgment they can't generate on their own. Your standards and expertise become the rubric that frontier AI is graded against. This is a standing listing for researchers who want AI training and evaluation work, not a sp",
+    "expected": "llm-domain-expert-stem"
+  },
+  {
+    "title": "Insurance Actuarial Specialists",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "**About the Role** Mercor is partnering with a leading AI lab to train frontier models on high-quality insurance reasoning data. We're hiring **Insurance** **Actuarial Specialists** to design realistic pricing, reserving, and risk-modeling scenarios, evaluate model outputs against established actuar",
+    "expected": "llm-domain-expert-professional"
+  },
+  {
+    "title": "Insurance Underwriting Specialists",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "**About the Role** Mercor is partnering with a leading AI lab to train frontier models on high-quality insurance reasoning data. We're hiring **Insurance Underwriting Specialists** to design realistic underwriting and risk-selection scenarios, evaluate model outputs against established industry stan",
+    "expected": "llm-domain-expert-professional"
+  },
+  {
+    "title": "RN Annotators",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "We're hiring inpatient Registered Nurses (RNs) to support clinical AI product work — helping us develop and evaluate new products on an ongoing basis, which is why continuity and a reliable weekly commitment matter. **What you'll do** - Support annotation, clinical review, model evaluation, and user",
+    "expected": "llm-domain-expert-professional"
+  },
+  {
+    "title": "Private Equity Associate – Consumer & Leisure (France/Europe)",
+    "platform": "mercor",
+    "location": "France / Europe (remote)",
+    "description_excerpt": "Mercor is hiring experienced **private equity associates** to build a financial model from a synthetic deal document pack, then peer-review models built by two other contractors on the same transaction. ### What you'll do - Build a working financial model of an assigned **consumer / leisure** transa",
+    "expected": "llm-domain-expert-professional",
+    "note": "Title alone reads as Mercor's own finance hire (corporate-role); body clarifies it builds a financial model from a synthetic deal pack and peer-reviews other contractors' models - AI training data work, not a real PE job."
+  },
+  {
+    "title": "Non-Investment Finance Expert (CL Funnel)",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "## Non-Investment Finance Expert — AI Training & Evaluation We're building frontier AI for complex, real-world finance work, and we need senior finance practitioners to produce and evaluate expert-grade work products that set the bar for what \"correct, professional output\" looks like. You'll work th",
+    "expected": "llm-domain-expert-professional"
+  },
+  {
+    "title": "Legal Expert",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "The research teams behind the best-known AI models come to Mercor for legal judgment they can't generate on their own. Your standards and expertise become the rubric that frontier AI is graded against. This is a standing listing for legal professionals who want AI training and evaluation work, not a",
+    "expected": "llm-domain-expert-professional"
+  },
+  {
+    "title": "Medical Expert",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "The research teams behind the best-known AI models come to Mercor for medical judgment they can't generate on their own. Your standards and expertise become the rubric that frontier AI is graded against. This is a standing listing for clinicians and health professionals who want AI training and eval",
+    "expected": "llm-domain-expert-professional"
+  },
+  {
+    "title": "Consultant Radiologist - Med AI Projects",
+    "platform": "imerit",
+    "location": "India",
+    "description_excerpt": "We are looking for Certified/Licensed Radiologists in India to join our team of medical experts and contribute their clinical expertise to the development of next-generation AI solutions in healthcare. As a Consultant Radiologist, you will work on AI data annotation and quality review projects invol",
+    "expected": "llm-domain-expert-professional"
+  },
+  {
+    "title": "Attorney Specialist - Freelance AI Trainer Project",
+    "platform": "invisible",
+    "location": "United States of America",
+    "description_excerpt": "p data-start= 240 data-end= 746 Are you a legal professional with litigation experience eager to shape the future of AI? Large-scale language models are evolving from clever chatbots into powerful engines of academic and professional exploration. With high-quality training data, tomorrow’s AI can de",
+    "expected": "llm-domain-expert-professional"
+  },
+  {
+    "title": "Software Engineering Expert",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "The research teams behind the best-known AI models come to Mercor for software engineering judgment they can't generate on their own. Your standards and expertise become the rubric that frontier AI is graded against. This is a standing listing for engineers who want AI training and evaluation work, ",
+    "expected": "coding-eval"
+  },
+  {
+    "title": "SWE-Bench Task Auditor",
+    "platform": "mercor",
+    "location": "Remote — United States",
+    "description_excerpt": "Evaluate the quality, correctness, and reproducibility of software-engineering benchmark tasks used to train and evaluate a frontier AI lab's models. You'll assess repository-level tasks, reference patches, test harnesses, and grading integrity — and provide clear, rubric-based written feedback. Bas",
+    "expected": "coding-eval"
+  },
+  {
+    "title": "AI-Assisted Developer Workflows (Trace) AI Task Auditor - Freelance AI Trainer Project",
+    "platform": "invisible",
+    "location": "World Wide - Remote",
+    "description_excerpt": "p data-path-to-node= 41 strong data-path-to-node= 41 data-index-in-node= 0 roject Overview /strong span class= Apple-converted-space nbsp; /span We are sourcing experienced technical specialists in AI-Assisted Developer Workflows to audit tasks used to train and evaluate AI systems. The objective of",
+    "expected": "coding-eval"
+  },
+  {
+    "title": "Search Engine Evaluation Specialist - Freelance AI Trainer Project",
+    "platform": "invisible",
+    "location": "United States of America",
+    "description_excerpt": "h3 strong Project Overview /strong /h3 p We are sourcing independent Search Engine Evaluation Specialists to provide their expertise for an AI benchmark evaluation project. As AI models increasingly interpret search intent, analyze indexing protocols, and evaluate search rank responses, their accura",
+    "expected": "search-rating"
+  },
+  {
+    "title": "PDF Annotation & Transcription Experts – Korean",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "**Fluent Language Skills Required:** Korean. Native fluency in Korean, including full command of Hangul, is required for this position. All annotation and transcription work is performed in Korean. **Why This Role Exists** Document understanding breaks down fastest in the languages that parsing and ",
+    "expected": "data-annotation",
+    "note": "'Transcription' in the title suggests audio-transcription, but the work is document/PDF annotation, not audio - description-based call."
+  },
+  {
+    "title": "Korean Language Specialist - QA",
+    "platform": "imerit",
+    "location": "South Korea",
+    "description_excerpt": "Position Overview: We are looking for detail-oriented Korean Language Specialists for a QA role with strong proficiency in Korean Language. In this role, you will support AI/ML projects by annotating, labeling, and transcribing content with high accuracy and consistency. This role is ideal for Bilin",
+    "expected": "data-annotation"
+  },
+  {
+    "title": "Japanese Language Specialist - GEN AI",
+    "platform": "imerit",
+    "location": "Japan",
+    "description_excerpt": "Position Overview: We are looking for detail-oriented Japanese Language Specialists for a multilingual AI data Annotation and Transcription Specialists with strong proficiency in Japanese. In this role, you will support AI/ML projects by annotating, labeling, and transcribing content with high accur",
+    "expected": "data-annotation"
+  },
+  {
+    "title": "Video Content Description Specialist Expertise Sought for AI Training",
+    "platform": "remotasks",
+    "location": "Manila, Manila, Philippines, Remote",
+    "description_excerpt": "p strong Outlier helps the world’s most innovative companies improve their AI models by providing human feedback. /strong strong Are you an experienced /strong strong Video Content Description expert /strong strong who would like to lend your expertise to train AI models? /strong /p p nbsp; /p p str",
+    "expected": "data-annotation"
+  },
+  {
+    "title": "Audio Transcription – English (Remote)",
+    "platform": "imerit",
+    "location": "UK",
+    "description_excerpt": "We are onboarding English Audio Transcribers for an upcoming AI-related project. If you have strong listening skills and can work in a time-bound environment, we’d love to hear from you.| 🧩 Role Overview| You will listen to English audio files and accurately transcribe them into text, following proj",
+    "expected": "audio-transcription"
+  },
+  {
+    "title": "Spanish (Spain) Professional Voice Actor",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "Mercor is hiring **Castilian Spanish Voice Actors** to work directly with a leading AI lab, improving their model's ability to handle and produce audio data. **Professional experience in Voice Acting is greatly preferred but not required.** We welcome people with speaking and audio experience throug",
+    "expected": "audio-recording"
+  },
+  {
+    "title": "Remote Japanese to Thai Translation Project",
+    "platform": "appen",
+    "location": "Japan",
+    "description_excerpt": "We are looking for native Thai speakers to join a Japanese translation project. In this project, you will translate Japanese content into Thai. The content includes professional topics such as medical, technology, and finance, so strong accuracy and understanding of technical terms are important. Wh",
+    "expected": "translation-localization"
+  },
+  {
+    "title": "Chinese Translator - Freelance AI Trainer Project",
+    "platform": "invisible",
+    "location": "Singapore",
+    "description_excerpt": "p Are you a Chinese translator eager to shape the future of AI? Large-scale language models are evolving from clever chatbots into powerful engines of linguistic intelligence. With high-quality training data, tomorrow’s AI can deliver accurate, context-aware translations, enhance cross-cultural comm",
+    "expected": "translation-localization"
+  },
+  {
+    "title": "American Sign Language (ASL) - Freelance AI Trainer Project",
+    "platform": "invisible",
+    "location": "World Wide - Remote",
+    "description_excerpt": "p Are you an American Sign Language expert eager to shape the future of AI? Large‑scale language models are evolving from clever chatbots into powerful engines of linguistic and cultural understanding. With high‑quality training data, tomorrow’s AI can democratize world‑class education, improve acce",
+    "expected": "linguistics-annotation",
+    "note": "Could read as translation-localization (interpreting) or data-collection-field; classified linguistics-annotation because ASL is treated here as a language-structure training problem, not a translation-pair task."
+  },
+  {
+    "title": "Apple Watch Users: Opportunity for You",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "**What this is** We're building a de-identified, real-world health dataset from Apple Health exports. Each contribution joins your on-device HealthKit data (activity, heart, sleep, and more) with clinical records (immunizations, labs, medications, vitals) from your linked health provider. **Who qual",
+    "expected": "data-collection-field"
+  },
+  {
+    "title": "EGO Embodied Data Collector Short-Term Project Contractor | Kuala Lumpur, Malaysia",
+    "platform": "appen",
+    "location": "Malaysia",
+    "description_excerpt": "📍 Location Between Bukit Jalil and Puchong, near Bandar Kinrara — within short driving distance to Bukit Jalil City and Puchong town centre. The exact site address will be shared once you are selected. 📅 Project Dates: 9 June – 12 June 2026 🕘 Working Hours: 9:00 AM – 6:00 PM daily 💵 Compensation: US",
+    "expected": "data-collection-field"
+  },
+  {
+    "title": "Driver – Data Collection (Contract)",
+    "platform": "sama",
+    "location": "San Francisco, California, United States",
+    "description_excerpt": "p span style= font-family: arial, helvetica, sans-serif; font-size: 10pt; Sama is supporting a professional services engagement with an automotive client to conduct structured real-world data collection using sensor-equipped vehicles. This project will collect high-quality driving data to support th",
+    "expected": "data-collection-field"
+  },
+  {
+    "title": "AI Safety Policy Evaluator, Violence & Threats | Seattle Onsite",
+    "platform": "handshake",
+    "location": "Seattle, WA",
+    "description_excerpt": "This is a non-engineering content-policy evaluation role. Applicants must demonstrate relevant depth in violent fiction or media, military or emergency response, crisis or threat assessment, trust and safety, content moderation, or closely related policy work. Software engineering or LLM product exp",
+    "expected": "content-moderation"
+  },
+  {
+    "title": "Qatar Educators",
+    "platform": "outlier",
+    "location": "Remote - Global",
+    "description_excerpt": "",
+    "expected": "other",
+    "note": "Swapped in during golden-gate tuning to replace a 3-way-unstable item (Bilingual Ukrainian Generalist Expert AI Safety, which two independent model runs split between ai-red-teaming and llm-eval-rlhf with no consistent read). Empty JS-rendered excerpt and a title that gives no task signal - a genuinely unclassifiable listing, not a labeling shortcut."
+  },
+  {
+    "title": "AI Rater Guidelines Writer (Linguist / Instructional Designer)",
+    "platform": "mercor",
+    "location": "United States",
+    "description_excerpt": "**Join a leading AI lab's cutting-edge GenAI team to be at the core of the AI revolution, where your expertise fuels the development of the most advanced Large Language Models.** # 1\\. Overview Join a leading AI lab's cutting-edge GenAI team and help build foundational AI models from the ground up. ",
+    "expected": "writing-editing",
+    "note": "Job title includes 'Linguist', pulling toward linguistics-annotation, but the deliverable is written rater-guideline documents, which is authoring, not linguistic data annotation."
+  },
+  {
+    "title": "AI Training for Igbo Writers",
+    "platform": "remotasks",
+    "location": "Remote -  Nigeria",
+    "description_excerpt": "p FOR IGBO WRITING EXPERTS ONLY /p p strong Are you interested in helping to train AI models to become better writers? /strong /p p strong How it works: /strong /p ul li style= font-weight: 400; span style= font-weight: 400; We have several open projects where we are looking for talented writers to ",
+    "expected": "writing-editing"
+  },
+  {
+    "title": "Chemicals Safety for Redteaming",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "**About the work** Mercor is assembling a panel of chemistry domain experts to red-team frontier AI models. The goal is to test whether a model can correctly judge the misuse potential of a technical request; answering legitimate questions fully while refusing genuinely dangerous ones. You will: - W",
+    "expected": "ai-red-teaming"
+  },
+  {
+    "title": "VP of Product, Handshake AI",
+    "platform": "handshake",
+    "location": "San Francisco, CA",
+    "description_excerpt": "ABOUT HANDSHAKE Handshake is the career network for the AI economy. 25 million knowledge workers, 1,600 educational institutions, 1 million employers (including 100% of the Fortune 50), and every foundational AI lab trust Handshake to power career discovery, hiring, and upskilling, from freelance AI",
+    "expected": "corporate-role"
+  },
+  {
+    "title": "Chief of Staff, Public Sector Engineering & Security",
+    "platform": "scale",
+    "location": "Washington, DC",
+    "description_excerpt": "p strong Chief of Staff, Public Sector /strong /p p As the Chief of Staff for Scale AI’s Public Sector business unit, you will be a strategic partner to the VP, Public Sector Engineering amp; Security, driving the execution of critical initiatives and optimizing the operational rhythm of the busines",
+    "expected": "corporate-role"
+  },
+  {
+    "title": "Technical Writer",
+    "platform": "scale",
+    "location": "San Francisco, CA",
+    "description_excerpt": "p At Scale, we believe that the next frontier of artificial intelligence is embodied. The Physical AI team is focused on building general AI that can reason and act in the physical world. By leveraging Scale’s massive, industry-leading data infrastructure, we are partnering with frontier labs to bui",
+    "expected": "corporate-role"
+  },
+  {
+    "title": "Controller",
+    "platform": "surge",
+    "location": "United States - Remote",
+    "description_excerpt": "About Us Our mission is to raise AGI with the richness of human intelligence — curious, witty, imaginative, and full of unexpected brilliance. Surge was founded by engineers and researchers who dreamed of building the next generation AI. We're building a platform that powers the most powerful models",
+    "expected": "corporate-role"
+  },
+  {
+    "title": "Chief of Staff (CEO's Office)",
+    "platform": "turing",
+    "location": "Palo Alto, California, United States; San Francisco, California, United States",
+    "description_excerpt": "div class= content-intro h1 span style= font-family: helvetica, arial, sans-serif; strong span style= font-size: 24pt; About Turing /span /strong /span /h1 p span id= m_-1033525666082252048m_-8288224233410703305gmail-docs-internal-guid-39386146-7fff-394b-7c89-9e58d80485b6 Turing’s mission is to acce",
+    "expected": "corporate-role"
+  },
+  {
+    "title": "VP of Marketing",
+    "platform": "prolific",
+    "location": "United States",
+    "description_excerpt": "p nbsp; /p p style= text-align: center; span style= font-family: tahoma, arial, helvetica, sans-serif; font-size: 24pt; color: rgb(126, 140, 141); strong Head of Product Marketing br US East Coast nbsp; /strong /span /p p nbsp; /p p style= text-align: center; span style= font-family: tahoma, arial, ",
+    "expected": "corporate-role"
+  },
+  {
+    "title": "Knowledge Base Writer",
+    "platform": "telus",
+    "location": "San Salvador, El Salvador",
+    "description_excerpt": "LOCATION: EL SALVADOR WORK STYLE: ON-SITE About the role: As a Knowledgebase Writer, you create, manage, publish, and maintain high-quality content in a knowledge base. You work closely with subject matter experts to identify content gaps and ensure accurate, clear, and relevant content. Main Respon",
+    "expected": "corporate-role"
+  },
+  {
+    "title": "Community Manager",
+    "platform": "remotasks",
+    "location": "Mexico - Remote",
+    "description_excerpt": "div class= p-rich_text_section strong data-stringify-type= bold Community Manager Role at Remotasks /strong /div div class= p-rich_text_section nbsp; /div div class= p-rich_text_section strong data-stringify-type= bold Job Description: /strong /div div class= p-rich_text_section nbsp; /div div class",
+    "expected": "corporate-role"
+  },
+  {
+    "title": "Sonic Audit Specialist - Hindi",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "## The role We are hiring native and near-native Hindi speakers to **audit AI training data in their own language**, not to produce it. You will work across two Amazon Sonic audit collections: 1. **Multilingual Transcription Audit.** You listen to a recording of human or agent speech, read the trans",
+    "expected": "audio-transcription",
+    "note": "Revised after golden-gate tuning: originally called 'other' (torn between audio-transcription/llm-eval-rlhf/data-annotation), but the model read this as audio-transcription confidently and consistently across two independent runs (0.80, 0.85) - the 'listen to a recording, read the transcript, audit it' framing is core transcription-QA work, so that is the better primary call."
+  },
+  {
+    "title": "MLOps Engineer, LLM Systems (Serving, GPU Kernels, Profiling)",
+    "platform": "mercor",
+    "location": "Canada, UK, US",
+    "description_excerpt": "**Join a leading AI lab's cutting-edge GenAI team to be at the core of the AI revolution, where your expertise fuels the development of the most advanced Large Language Models.** # 1\\. Overview Join a leading AI lab's cutting-edge GenAI team and help build foundational AI models from the ground up. ",
+    "expected": "other",
+    "note": "Reads as production ML-infrastructure engineering (serving, GPU kernels, profiling) embedded with a client lab via Mercor - not corporate-role (not Mercor's own staff) and not coding-eval (not benchmark-task evaluation); no taxonomy key fits."
+  },
+  {
+    "title": "Generalist Expert",
+    "platform": "mercor",
+    "location": "Remote",
+    "description_excerpt": "The research teams behind the best-known AI models come to Mercor for careful human judgment they can't generate on their own. Your standards and attention become the rubric that frontier AI is graded against. This is a standing listing for generalists who want AI training and evaluation work, not a",
+    "expected": "llm-eval-rlhf",
+    "note": "Revised after golden-gate tuning round 1: 'your standards... become the rubric frontier AI is graded against' is generic response-grading, which is llm-eval-rlhf's core definition even without a named domain; originally called 'other' as too vague, but the model's independent llm-eval-rlhf read (0.85 confidence) is the better primary call."
+  },
+  {
+    "title": "Anthropology Specialist - Freelance AI Trainer Project",
+    "platform": "invisible",
+    "location": "United States of America",
+    "description_excerpt": "p Are you an anthropology expert eager to shape the future of AI? Large‑scale language models are evolving from clever chatbots into powerful engines of cultural and scientific understanding. With high‑quality training data, tomorrow’s AI can democratize world‑class education, keep pace with emergin",
+    "expected": "other",
+    "note": "Anthropology is a genuine taxonomy gap: not STEM (math/physics/chemistry/biology) and not the professional list (law/finance/medicine/accounting), so it fits no defined key."
+  }
+]
