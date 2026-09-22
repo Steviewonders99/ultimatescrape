@@ -150,3 +150,41 @@ async def test_missing_external_id_dropped_and_counted(pool):
         "SELECT metadata FROM sync_runs WHERE name='competitor_boards'"
         " ORDER BY id DESC LIMIT 1"))
     assert meta["missing_external_id"] == {"outlier": 1}
+
+
+@requires_pg
+async def test_all_empty_ids_withholds_delist_authority_not_mass_delist(pool):
+    """Mass-delist side door (production incident class, occurred twice this
+    cycle): the zero-listing anomaly guard checks ok[key] BEFORE the
+    missing-external_id drop/dedup step runs. If a platform's fetch returns
+    listings that ALL have an empty external_id, ok[key] is still non-empty
+    at that check -> the platform reads as "succeeded" -> every one of its
+    surviving-in-DB rows would be delisted by plan_changes, with the run
+    itself reporting status 'ok'. A platform must never get delisting
+    authority in the same run it silently lost 100% of its ids."""
+    await pool.execute(ddl.TEST_SYNC_RUNS_DDL)
+    await ddl.apply(pool)
+
+    # seed one live row for 'outlier'
+    s1 = await sync_boards(pool, platforms=["outlier"], fetch=fake_fetch([L(ext="keep-me")]))
+    assert s1["inserted"] == 1
+
+    # next fetch: every listing from 'outlier' has an empty external_id
+    bad_only = [L(ext="", title="t1"), L(ext="", title="t2")]
+    s2 = await sync_boards(pool, platforms=["outlier"], fetch=fake_fetch(bad_only))
+
+    assert s2["missing_external_id"] == {"outlier": 2}
+    assert s2["delist_withheld"] == ["outlier"]
+    assert s2["delisted"] == 0
+
+    still_live = await pool.fetchval(
+        "SELECT count(*) FROM competitor_listing"
+        " WHERE external_id='keep-me' AND delisted_at IS NULL")
+    assert still_live == 1
+
+    last = await pool.fetchrow(
+        "SELECT status, metadata FROM sync_runs WHERE name='competitor_boards'"
+        " ORDER BY id DESC LIMIT 1")
+    assert last["status"] == "ok"
+    meta = json.loads(last["metadata"])
+    assert meta["delist_withheld"] == ["outlier"]

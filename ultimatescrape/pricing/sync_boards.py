@@ -231,6 +231,20 @@ async def sync_boards(
         deduped.append(l)
     fetched = deduped
 
+    # Mass-delist side door (production incident class, twice this cycle):
+    # the zero-listing anomaly guard above runs BEFORE this drop/dedup step,
+    # so a platform whose fetch returns listings that ALL fail the
+    # missing-external_id check still reads as "succeeded" up there (ok[key]
+    # was non-empty) while contributing ZERO surviving listings here. Left
+    # alone, plan_changes would then see that platform as both succeeded AND
+    # missing every one of its existing rows from `fetched` -> delists all
+    # of them. A platform that dropped even one listing to a missing id this
+    # run cannot be trusted to say "yes, that other listing is really gone"
+    # — withhold ONLY its delisting authority; inserts/updates of whatever
+    # DID survive still proceed normally.
+    delist_withheld = sorted(missing_external_id)
+    succeeded_platforms = set(ok) - set(delist_withheld)
+
     norms = {
         id(l): normalize.usd_hourly(
             {"pay_min": l.pay_min, "pay_max": l.pay_max,
@@ -259,7 +273,7 @@ async def sync_boards(
         )
         for r in rows
     }
-    cs = diff.plan_changes(existing, fetched, set(ok), now)
+    cs = diff.plan_changes(existing, fetched, succeeded_platforms, now)
 
     summary = {
         "platforms_ok": sorted(ok), "platforms_failed": dict(sorted(errors.items())),
@@ -269,6 +283,7 @@ async def sync_boards(
         "quarantined": sum(1 for n in norms.values() if n["quarantined"]),
         "missing_external_id": dict(sorted(missing_external_id.items())),
         "duplicate_keys_dropped": duplicate_keys_dropped,
+        "delist_withheld": delist_withheld,
     }
     if dry_run:
         log.info("[pricing] DRY RUN boards: %s", summary)
