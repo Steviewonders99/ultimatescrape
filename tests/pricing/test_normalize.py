@@ -75,6 +75,8 @@ def test_fx_stamp_only_when_converted():
     ("", ""),
     ("Manila, Philippines", "PH"),
     ("United Kingdom", "GB"),
+    ("Kyiv, Ukraine", "UA"),
+    ("Remote - UK", "GB"),
 ])
 def test_country_from_location(raw, iso):
     assert normalize.country_from_location(raw) == iso
