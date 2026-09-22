@@ -22,3 +22,5 @@ runs/*
 # Knowledge graph — local capture store, machine-specific
 knowledge/*
 !knowledge/.gitkeep
+
+.DS_Store
