@@ -51,6 +51,15 @@ def _pay_json(l: Listing) -> dict:
             "pay_raw": l.pay_raw}
 
 
+def _pay_json_from_key(key: tuple) -> dict:
+    """Convert pay_key tuple to named-field dict for old_pay in history.
+
+    No pay_raw — it is genuinely unavailable from ExistingRow.
+    """
+    return {"pay_min": key[0], "pay_max": key[1],
+            "pay_currency": key[2], "pay_unit": key[3]}
+
+
 def plan_changes(
     existing: dict[tuple[str, str], ExistingRow],
     fetched: list[Listing],
@@ -84,7 +93,7 @@ def plan_changes(
         change = "pay_change" if pay_key(l) != row.pay_key else "jd_change"
         cs.history.append({
             "listing_id": row.id, "observed_at": now, "change_type": change,
-            "old_pay": None if change == "jd_change" else {"pay_key": list(row.pay_key)},
+            "old_pay": None if change == "jd_change" else _pay_json_from_key(row.pay_key),
             "new_pay": _pay_json(l), "content_hash": new_hash,
         })
 
@@ -95,7 +104,7 @@ def plan_changes(
         cs.delists.append(row.id)
         cs.history.append({
             "listing_id": row.id, "observed_at": now, "change_type": "delisted",
-            "old_pay": {"pay_key": list(row.pay_key)}, "new_pay": None,
+            "old_pay": _pay_json_from_key(row.pay_key), "new_pay": None,
             "content_hash": row.content_hash,
         })
     return cs

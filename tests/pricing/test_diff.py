@@ -39,6 +39,7 @@ def test_pay_change_yields_update_and_history():
     assert cs.updates == [(1, new)]
     assert cs.history[0]["change_type"] == "pay_change"
     assert cs.history[0]["listing_id"] == 1
+    assert cs.history[0]["old_pay"] == {"pay_min": 25.0, "pay_max": None, "pay_currency": "USD", "pay_unit": "hour"}
 
 
 def test_jd_change_without_pay_change():
