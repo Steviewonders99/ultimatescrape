@@ -14,6 +14,7 @@ import asyncpg
 
 TAXONOMY_VERSION = "v1"
 BATCH_SIZE = 10
+MAX_TOKENS = 8000
 MODEL_LABEL = "pricing-classify"
 
 SYSTEM = (
@@ -31,8 +32,8 @@ Use "other" when genuinely unsure. confidence is your honest probability.
 """
 
 
-def build_prompt(listings: list[dict]) -> str:
-    tax_lines = listings_taxonomy_lines()
+def build_prompt(listings: list[dict], taxonomy_lines: str | None = None) -> str:
+    tax_lines = taxonomy_lines if taxonomy_lines is not None else _default_taxonomy_lines()
     items = [
         {"i": i, "title": l["title"], "platform": l["platform"],
          "location": l.get("location") or "",
@@ -46,16 +47,18 @@ def build_prompt(listings: list[dict]) -> str:
     )
 
 
-_TAXONOMY_CACHE: str = ""
+def taxonomy_lines_from_rows(rows) -> str:
+    """The DB's ``market_taxonomy`` table is the source of truth for prompt
+    text. ``classify_new`` always builds the prompt from these live rows."""
+    return "\n".join(f"{r['key']}: {r['description']}" for r in rows)
 
 
-def listings_taxonomy_lines() -> str:
-    # populated by classify_new from the DB; falls back to ddl seed for tests
-    global _TAXONOMY_CACHE
-    if not _TAXONOMY_CACHE:
-        from ultimatescrape.pricing.ddl import TAXONOMY_SEED
-        _TAXONOMY_CACHE = "\n".join(f"{k}: {d}" for k, _, d in TAXONOMY_SEED)
-    return _TAXONOMY_CACHE
+def _default_taxonomy_lines() -> str:
+    """Fallback only for callers with no database at hand (e.g. the DB-less
+    golden test). Never used by ``classify_new`` — that always passes the
+    live ``market_taxonomy`` rows explicitly."""
+    from ultimatescrape.pricing.ddl import TAXONOMY_SEED
+    return "\n".join(f"{k}: {d}" for k, _, d in TAXONOMY_SEED)
 
 
 def parse_response(data: dict, n: int, valid_keys: set[str]) -> list[dict]:
@@ -86,9 +89,11 @@ def parse_response(data: dict, n: int, valid_keys: set[str]) -> list[dict]:
 async def classify_new(
     pool: asyncpg.Pool, *, limit: int | None = None, llm=None
 ) -> dict:
-    valid = {
-        r["key"] for r in await pool.fetch("SELECT key FROM market_taxonomy")
-    }
+    taxonomy_rows = await pool.fetch(
+        "SELECT key, label, description FROM market_taxonomy"
+    )
+    valid = {r["key"] for r in taxonomy_rows}
+    tax_lines = taxonomy_lines_from_rows(taxonomy_rows)
     rows = await pool.fetch(
         """
         SELECT l.id, l.title, l.platform, l.location_raw AS location,
@@ -118,8 +123,8 @@ async def classify_new(
         for start in range(0, len(listings), BATCH_SIZE):
             batch = listings[start:start + BATCH_SIZE]
             data, _ = await client.complete_json(
-                build_prompt(batch), system=SYSTEM, max_tokens=8000,
-                temperature=0.0, label=MODEL_LABEL,
+                build_prompt(batch, taxonomy_lines=tax_lines), system=SYSTEM,
+                max_tokens=MAX_TOKENS, temperature=0.0, label=MODEL_LABEL,
             )
             results = parse_response(data if isinstance(data, dict) else {},
                                      n=len(batch), valid_keys=valid)

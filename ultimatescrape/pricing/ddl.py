@@ -116,7 +116,8 @@ TAXONOMY_SEED: list[tuple[str, str, str]] = [
     ("llm-eval-rlhf", "LLM evaluation / RLHF",
      "Rating, ranking or rewriting AI model responses; preference data; RLHF."),
     ("llm-domain-expert-stem", "Domain expert - STEM",
-     "Math, physics, chemistry, biology experts creating or grading AI training tasks."),
+     ("Math, physics, chemistry, biology and other natural or life sciences — "
+      "purely social-science roles are NOT stem.")),
     ("llm-domain-expert-professional", "Domain expert - professional",
      "Law, finance, medicine, accounting or other credentialed-professional AI work."),
     ("coding-eval", "Coding / SWE tasks",

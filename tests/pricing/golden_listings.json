@@ -56,7 +56,8 @@
     "platform": "mercor",
     "location": "Remote",
     "description_excerpt": "The research teams behind the best-known AI models come to Mercor for scientific judgment they can't generate on their own. Your standards and expertise become the rubric that frontier AI is graded against. This is a standing listing for researchers who want AI training and evaluation work, not a sp",
-    "expected": "llm-domain-expert-stem"
+    "expected": "llm-domain-expert-stem",
+    "note": "STEM boundary rule: this posting bundles natural/life science ('Physical') with social science in one listing, so it stays stem (mixed natural+social science -> stem). A PURELY social-science posting (e.g. Anthropology Specialist below) is other, not stem."
   },
   {
     "title": "Insurance Actuarial Specialists",
@@ -359,6 +360,6 @@
     "location": "United States of America",
     "description_excerpt": "p Are you an anthropology expert eager to shape the future of AI? Large‑scale language models are evolving from clever chatbots into powerful engines of cultural and scientific understanding. With high‑quality training data, tomorrow’s AI can democratize world‑class education, keep pace with emergin",
     "expected": "other",
-    "note": "Anthropology is a genuine taxonomy gap: not STEM (math/physics/chemistry/biology) and not the professional list (law/finance/medicine/accounting), so it fits no defined key."
+    "note": "STEM boundary rule: anthropology is PURELY social science (no natural/life-science component), so it stays other, not stem. Contrast with 'Life, Physical & Social Science Expert' above, which bundles natural science ('Physical') with social science and so IS stem. Also not the professional list (law/finance/medicine/accounting), so no defined key fits."
   }
 ]

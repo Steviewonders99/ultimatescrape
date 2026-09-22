@@ -25,6 +25,7 @@ class StubLLM:
     def __init__(self, responses: list[dict]) -> None:
         self._responses = list(responses)
         self.calls: list[str] = []
+        self.prompts: list[str] = []
 
     async def __aenter__(self) -> "StubLLM":
         return self
@@ -34,6 +35,7 @@ class StubLLM:
 
     async def complete_json(self, prompt: str, **kwargs):
         self.calls.append(kwargs.get("label", ""))
+        self.prompts.append(prompt)
         return self._responses.pop(0), None
 
 
@@ -132,6 +134,32 @@ async def test_classify_new_limit_and_no_listings(pool):
     assert n == 1
 
 
+@requires_pg
+async def test_classify_new_reads_taxonomy_from_db_not_ddl_seed(pool):
+    """The prompt must be built from the live market_taxonomy table, not the
+    ddl.py seed — a DB edit to a description must reach the model without a
+    code change. Proven by mutating one row post-seed and inspecting the
+    exact prompt text the (stubbed) LLM received."""
+    await ddl.apply(pool)
+    marker = "CUSTOM-DB-ONLY-MARKER-9f2 for search rating work"
+    await pool.execute(
+        "UPDATE market_taxonomy SET description = $1 WHERE key = 'search-rating'",
+        marker,
+    )
+    await _insert_listing(pool, external_id="c1", title="Some Role")
+
+    stub = StubLLM([{"results": [
+        {"i": 0, "market_type": "search-rating", "confidence": 0.9},
+    ]}])
+    await classify_new(pool, llm=stub)
+
+    assert len(stub.prompts) == 1
+    assert marker in stub.prompts[0]
+    from ultimatescrape.pricing.ddl import TAXONOMY_SEED
+    stale_seed_text = next(d for k, _, d in TAXONOMY_SEED if k == "search-rating")
+    assert stale_seed_text not in stub.prompts[0]
+
+
 @requires_llm
 async def test_golden_agreement_gate():
     from ultimatescrape.llm.client import KimiClient
@@ -148,7 +176,7 @@ async def test_golden_agreement_gate():
         for start in range(0, len(golden), classify.BATCH_SIZE):
             batch = golden[start:start + classify.BATCH_SIZE]
             data, meta = await llm.complete_json(
-                build_prompt(batch), system=SYSTEM, max_tokens=8000,
+                build_prompt(batch), system=SYSTEM, max_tokens=classify.MAX_TOKENS,
                 temperature=0.0, label="pricing-classify-golden")
             finish_reasons.append(getattr(meta, "finish_reason", None))
             for g, r in zip(batch, parse_response(data, len(batch), valid)):
