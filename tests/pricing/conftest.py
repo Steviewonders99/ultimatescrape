@@ -17,4 +17,13 @@ async def pool():
     try:
         yield p
     finally:
+        # Clean up all pricing-related tables between tests
+        async with p.acquire() as conn:
+            await conn.execute("DROP TABLE IF EXISTS competitor_listing_class CASCADE")
+            await conn.execute("DROP TABLE IF EXISTS competitor_listing_history CASCADE")
+            await conn.execute("DROP TABLE IF EXISTS competitor_listing CASCADE")
+            await conn.execute("DROP TABLE IF EXISTS market_taxonomy CASCADE")
+            await conn.execute("DROP TABLE IF EXISTS our_buy_rate CASCADE")
+            await conn.execute("DROP TABLE IF EXISTS dealforce_opportunity CASCADE")
+            await conn.execute("DROP TABLE IF EXISTS sync_runs CASCADE")
         await p.close()

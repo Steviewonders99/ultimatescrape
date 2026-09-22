@@ -33,6 +33,38 @@ app = typer.Typer(
 )
 console = Console()
 
+# ── pricing benchmark ─────────────────────────────────────────────────────────
+
+pricing_app = typer.Typer(
+    no_args_is_help=True,
+    help="Competitor pricing benchmark: warehouse schema and daily sync.",
+)
+app.add_typer(pricing_app, name="pricing")
+
+
+@pricing_app.command("init-db")
+def pricing_init_db(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
+    """Create/refresh the pricing benchmark tables in the warehouse (idempotent)."""
+    _setup_logging(verbose)
+
+    async def _run() -> None:
+        import asyncpg
+
+        from .pricing import config as pcfg
+        from .pricing import ddl
+
+        pool = await asyncpg.create_pool(pcfg.warehouse_dsn(), min_size=1, max_size=2)
+        try:
+            await ddl.apply(pool)
+            for t in ("competitor_listing", "market_taxonomy", "our_buy_rate",
+                      "dealforce_opportunity"):
+                n = await pool.fetchval(f"SELECT count(*) FROM {t}")
+                console.print(f"  {t}: {n} rows")
+        finally:
+            await pool.close()
+
+    asyncio.run(_run())
+
 
 def _setup_logging(verbose: bool) -> None:
     logging.basicConfig(
