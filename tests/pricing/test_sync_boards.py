@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from tests.pricing.conftest import requires_pg
@@ -99,3 +101,52 @@ def test_text_field_guard_allows_none_and_str():
     l = L(ext="ok")
     l.department = None  # None is a valid TEXT-column value
     _assert_text_fields(l)  # must not raise
+
+
+@requires_pg
+async def test_duplicate_external_id_in_one_fetch_is_deduped_not_crashed(pool):
+    """Production incident 22 Sep 2026: mercor/imerit adapters emitted an
+    empty external_id for every listing, so two-or-more in the same fetch
+    collided on the (platform, external_id) UNIQUE constraint and rolled
+    back the whole transaction. The adapters are now fixed at the source
+    (see test_fetcher_fulljd.py), but the writer must ALSO guard here —
+    dedupe by (platform, external_id), keep the first, count the rest —
+    so any future adapter quirk degrades to a counted drop, not a crash."""
+    await pool.execute(ddl.TEST_SYNC_RUNS_DDL)
+    await ddl.apply(pool)
+    first = L(ext="dup1", title="First")
+    second = L(ext="dup1", title="Second")  # same key, different content
+    s = await sync_boards(pool, platforms=["outlier"],
+                          fetch=fake_fetch([first, second]))
+    assert s["inserted"] == 1
+    assert s["duplicate_keys_dropped"] == 1
+    n = await pool.fetchval(
+        "SELECT count(*) FROM competitor_listing WHERE external_id='dup1'")
+    assert n == 1
+    title = await pool.fetchval(
+        "SELECT title FROM competitor_listing WHERE external_id='dup1'")
+    assert title == "First"  # first wins, deterministically
+
+    meta = json.loads(await pool.fetchval(
+        "SELECT metadata FROM sync_runs WHERE name='competitor_boards'"
+        " ORDER BY id DESC LIMIT 1"))
+    assert meta["duplicate_keys_dropped"] == 1
+
+
+@requires_pg
+async def test_missing_external_id_dropped_and_counted(pool):
+    await pool.execute(ddl.TEST_SYNC_RUNS_DDL)
+    await ddl.apply(pool)
+    bad = L(ext="")   # empty external_id, e.g. an adapter id-field bug
+    good = L(ext="ok1")
+    s = await sync_boards(pool, platforms=["outlier"],
+                          fetch=fake_fetch([bad, good]))
+    assert s["inserted"] == 1
+    assert s["missing_external_id"] == {"outlier": 1}
+    n = await pool.fetchval("SELECT count(*) FROM competitor_listing")
+    assert n == 1
+
+    meta = json.loads(await pool.fetchval(
+        "SELECT metadata FROM sync_runs WHERE name='competitor_boards'"
+        " ORDER BY id DESC LIMIT 1"))
+    assert meta["missing_external_id"] == {"outlier": 1}

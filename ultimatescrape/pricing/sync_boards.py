@@ -203,6 +203,34 @@ async def sync_boards(
 
     fx = await load_fx(FX_CACHE)
     fetched: list[Listing] = [l for batch in ok.values() for l in batch]
+
+    # Writer-level guard: an adapter bug (wrong/absent id field) or a feed
+    # quirk can hand back an empty or repeated external_id — observed live
+    # on mercor/imerit (empty id: both adapters read a field the feed
+    # doesn't have). The UNIQUE constraint on (platform, external_id) is
+    # the backstop, but a constraint violation aborts the WHOLE transaction
+    # (spec: loud failure, never silent data loss) — one bad listing must
+    # not block every OTHER listing on the same platform from syncing.
+    # Drop the offenders here instead, loudly counted in the summary/
+    # sync_runs metadata rather than silently. "First wins" is deterministic
+    # given one fetch: platform order follows `keys`, and within a platform
+    # the adapter's own list order.
+    missing_external_id: dict[str, int] = {}
+    duplicate_keys_dropped = 0
+    seen_keys: set[tuple[str, str]] = set()
+    deduped: list[Listing] = []
+    for l in fetched:
+        if not l.external_id:
+            missing_external_id[l.platform] = missing_external_id.get(l.platform, 0) + 1
+            continue
+        key = (l.platform, l.external_id)
+        if key in seen_keys:
+            duplicate_keys_dropped += 1
+            continue
+        seen_keys.add(key)
+        deduped.append(l)
+    fetched = deduped
+
     norms = {
         id(l): normalize.usd_hourly(
             {"pay_min": l.pay_min, "pay_max": l.pay_max,
@@ -239,6 +267,8 @@ async def sync_boards(
         "touched": len(cs.touches), "delisted": len(cs.delists),
         "relisted": len(cs.relists),
         "quarantined": sum(1 for n in norms.values() if n["quarantined"]),
+        "missing_external_id": dict(sorted(missing_external_id.items())),
+        "duplicate_keys_dropped": duplicate_keys_dropped,
     }
     if dry_run:
         log.info("[pricing] DRY RUN boards: %s", summary)

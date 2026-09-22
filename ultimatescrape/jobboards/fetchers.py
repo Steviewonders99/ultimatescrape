@@ -13,6 +13,7 @@ competitive pricing comparison.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -461,14 +462,24 @@ class JobBoardClient:
                 if _as_float(rate)
                 else {}
             )
+            # Mercor's __NEXT_DATA__ job objects carry no "id" field at all
+            # (verified live, 375/375 listings) — the stable identifier is
+            # "listingId" (e.g. "list_AAABoMZlDn5LJvVj3XBA3YGz"). The old
+            # job.get("id", "") always fell through to "" for every listing,
+            # so every mercor row collided on (platform="mercor",
+            # external_id="") the moment more than one was fetched in the
+            # same run, and every url was empty too.
+            listing_id = job.get("listingId") or ""
+            title = str(job.get("title", ""))
+            url = f"https://work.mercor.com/jobs/{listing_id}" if listing_id else ""
             out.append(
                 Listing(
                     platform=p.key,
                     company=p.company,
-                    title=str(job.get("title", "")),
-                    url=f"https://work.mercor.com/jobs/{job.get('id', '')}" if job.get("id") else "",
+                    title=title,
+                    url=url,
                     location=str(job.get("location", "") or "remote"),
-                    external_id=str(job.get("id", "")),
+                    external_id=_stable_external_id(listing_id, url=url, title=title),
                     worker_gig=True,
                     description_excerpt=_strip_html(str(job.get("description", "")), 300),
                     description_full=_full_text(str(job.get("description", ""))),
@@ -533,16 +544,25 @@ class JobBoardClient:
             pay = numeric_pay(
                 raw_rate, currency=str(job.get("currency", "") or "local"), unit="hour"
             ) or parse_pay(raw_rate)
+            # iMerit's jobs.json has no "id" field at all (verified live,
+            # 36/36 listings) — the stable identifier is "job_id" (e.g.
+            # "GLO-057"), with "slug" as a secondary native candidate. The
+            # old job.get("id", "") always fell through to "" for every
+            # listing, so every imerit row collided on (platform="imerit",
+            # external_id="") the moment more than one was fetched.
+            job_id = job.get("job_id") or job.get("slug") or ""
+            title = job.get("title", "")
+            url = job.get("apply_link", "") or "https://imerit.ai/jobs.json"
             out.append(
                 Listing(
                     platform=p.key,
                     company=p.company,
-                    title=job.get("title", ""),
-                    url=job.get("apply_link", "") or "https://imerit.ai/jobs.json",
+                    title=title,
+                    url=url,
                     location=job.get("location", ""),
                     employment_type=job.get("job_type", ""),
                     posted_at=str(job.get("posted_date", ""))[:10],
-                    external_id=str(job.get("id", "")),
+                    external_id=_stable_external_id(job_id, url=url, title=title),
                     worker_gig=True,
                     description_excerpt=_strip_html(str(job.get("description", "")), 300),
                     description_full=_full_text(str(job.get("description", ""))),
@@ -609,6 +629,38 @@ def _location_text(value: Any) -> str:
         name = value.get("name")
         if isinstance(name, str):
             return name
+    return ""
+
+
+def _stable_external_id(native_id: Any, *, url: str, title: str) -> str:
+    """Deterministic external_id for a listing.
+
+    Prefer a native id straight from the feed — call this with whatever
+    field is genuinely that feed's stable identifier. When that is
+    genuinely absent (the field is empty/missing, not merely mis-named —
+    fix the adapter for that case instead), derive one so lifecycle
+    tracking (insert vs update vs delist, keyed on (platform, external_id))
+    still works run-to-run rather than colliding on "":
+
+      1. the URL's last path segment, if it looks like a distinct slug/tail
+      2. sha256 of the URL, if a URL exists but has no usable tail
+      3. sha256 of the title, as the last resort
+
+    Never returns "" when url or title is non-empty — an empty
+    external_id collides with every OTHER empty external_id on the same
+    platform under the (platform, external_id) UNIQUE constraint (this is
+    exactly the mercor/imerit production incident this function exists to
+    prevent).
+    """
+    if native_id:
+        return str(native_id)
+    if url:
+        tail = url.rstrip("/").rsplit("/", 1)[-1]
+        if tail and tail != url:
+            return tail
+        return hashlib.sha256(url.encode()).hexdigest()
+    if title:
+        return hashlib.sha256(title.encode()).hexdigest()
     return ""
 
 
