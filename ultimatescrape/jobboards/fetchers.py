@@ -64,6 +64,7 @@ class Listing:
     worker_gig: bool = False
     external_id: str = ""
     description_excerpt: str = ""
+    description_full: str = ""
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -146,6 +147,11 @@ def _strip_html(text: str, limit: int = 400) -> str:
     return re.sub(r"\s+", " ", clean).strip()[:limit]
 
 
+def _full_text(text: str) -> str:
+    """Plain text of an HTML fragment, untruncated (full-JD capture)."""
+    return _strip_html(text, limit=10_000_000)
+
+
 class JobBoardClient:
     def __init__(self) -> None:
         self._http = httpx.AsyncClient(
@@ -210,6 +216,28 @@ class JobBoardClient:
                 listing.worker_gig = True
         return out
 
+    async def fetch_all(
+        self, keys: Sequence[str]
+    ) -> tuple[dict[str, list[Listing]], dict[str, str]]:
+        """Per-platform results AND errors — lifecycle sync needs to know
+        which platforms succeeded, which fetch_many discards."""
+        import asyncio
+
+        batches = await asyncio.gather(
+            *(self.fetch(k) for k in keys), return_exceptions=True
+        )
+        ok: dict[str, list[Listing]] = {}
+        errors: dict[str, str] = {}
+        for key, batch in zip(keys, batches):
+            if isinstance(batch, BaseException):
+                errors[key] = f"{type(batch).__name__}: {batch}"
+                continue
+            for listing in batch:
+                if not listing.worker_gig and listing.pay_unit in _GIG_PAY_UNITS:
+                    listing.worker_gig = True
+            ok[key] = batch
+        return ok, errors
+
     # ── ATS adapters ──────────────────────────────────────────────────────────
 
     async def _greenhouse(self, p: Platform) -> list[Listing]:
@@ -235,6 +263,7 @@ class JobBoardClient:
                     external_id=str(job.get("id", "")),
                     worker_gig=p.worker_gigs,
                     description_excerpt=content[:300],
+                    description_full=_full_text(job.get("content", "")),
                     employment_type=str(meta.get("Employment Type", "")),
                     **pay,
                 )
@@ -275,6 +304,7 @@ class JobBoardClient:
                     worker_gig=p.worker_gigs,
                     remote=categories.get("allLocations", [""])[0] if categories.get("allLocations") else "",
                     description_excerpt=_strip_html(job.get("descriptionPlain", ""), 300),
+                    description_full=_full_text(job.get("descriptionPlain", "")),
                     **pay,
                 )
             )
@@ -311,6 +341,7 @@ class JobBoardClient:
                     remote="remote" if job.get("isRemote") else "",
                     worker_gig=p.worker_gigs,
                     description_excerpt=_strip_html(job.get("descriptionPlain", ""), 300),
+                    description_full=_full_text(job.get("descriptionPlain", "")),
                     **pay,
                 )
             )
@@ -394,6 +425,7 @@ class JobBoardClient:
                     external_id=str(job.get("id", "")),
                     worker_gig=True,
                     description_excerpt=_strip_html(str(job.get("description", "")), 300),
+                    description_full=_full_text(str(job.get("description", ""))),
                     **pay,
                 )
             )
@@ -439,6 +471,7 @@ class JobBoardClient:
                     external_id=str(job.get("id", "")),
                     worker_gig=True,
                     description_excerpt=_strip_html(str(job.get("description", "")), 300),
+                    description_full=_full_text(str(job.get("description", ""))),
                     **pay,
                 )
             )
@@ -480,6 +513,7 @@ class JobBoardClient:
                         external_id=str(job.get("id", "") or job.get("_id", "")),
                         worker_gig=True,
                         description_excerpt=_strip_html(str(job.get("description", "")), 300),
+                        description_full=_full_text(str(job.get("description", ""))),
                         **pay,
                     )
                 )
@@ -511,6 +545,7 @@ class JobBoardClient:
                     external_id=str(job.get("id", "")),
                     worker_gig=True,
                     description_excerpt=_strip_html(str(job.get("description", "")), 300),
+                    description_full=_full_text(str(job.get("description", ""))),
                     **pay,
                 )
             )
