@@ -32,6 +32,18 @@ tables' `id` is bigint (confirmed via information_schema, 2026-09-22), and
 project_resource_info's ids mix 16- and 18-digit values -- a text-cast
 ORDER BY would misorder those (e.g. '100...' < '1815...' as text despite
 being numerically far larger) and silently skip or loop rows mid-page.
+
+Writes are BATCHED one executemany() per proxy page, not one execute() per
+row. Controller performance ruling 2026-09-22: row-by-row INSERT..ON
+CONFLICT from the laptop to Azure PG at ~50-100ms RTT projected ~16h for
+the full ~400K-row bootstrap (53K rows in ~2.5h observed). Same UPSERT_SQL,
+same per-row value computation (decode/currency/FX unchanged), same
+ordering and is_current semantics -- only the write call changes, from
+PAGE per-row round-trips to one round-trip per page (~80 batches total
+across all four tables at PAGE=5000 instead of ~400K). executemany() runs
+in its own implicit transaction per call, which is fine here and arguably
+better than the old per-row autocommit: each page either lands atomically
+or not at all.
 """
 
 from __future__ import annotations
@@ -60,6 +72,26 @@ TABLES_WITH_IS_DELETED = {
     "project_resource_info",
     "configuration_client_rate",
 }
+
+#: Unchanged from the per-row version -- only the call site (executemany
+#: vs execute-per-row) changed.
+UPSERT_SQL = """
+    INSERT INTO our_buy_rate
+      (source_table, source_pk, side, project_id, locale,
+       country_code, currency, rate, rate_unit_code,
+       rate_unit_decoded, rate_usd_hour, rate_fx_as_of,
+       synced_at, is_current)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,TRUE)
+    ON CONFLICT (source_table, source_pk) DO UPDATE SET
+      side=EXCLUDED.side, project_id=EXCLUDED.project_id,
+      locale=EXCLUDED.locale, country_code=EXCLUDED.country_code,
+      currency=EXCLUDED.currency,
+      rate=EXCLUDED.rate, rate_unit_code=EXCLUDED.rate_unit_code,
+      rate_unit_decoded=EXCLUDED.rate_unit_decoded,
+      rate_usd_hour=EXCLUDED.rate_usd_hour,
+      rate_fx_as_of=EXCLUDED.rate_fx_as_of,
+      synced_at=EXCLUDED.synced_at, is_current=TRUE
+"""
 
 
 def _country_code(locale: str | None) -> str | None:
@@ -122,6 +154,7 @@ async def sync_rates(pool: asyncpg.Pool) -> dict:
                     f"ORDER BY {src.pk_col} LIMIT {PAGE}")
                 if not rows:
                     break
+                args_list = []
                 for r in rows:
                     raw_unit_code = r.get("rate_unit")
                     unit = decode(raw_unit_code)
@@ -138,24 +171,7 @@ async def sync_rates(pool: asyncpg.Pool) -> dict:
                         (str(r.get(src.project_col) or "") or None)
                         if src.project_col else None
                     )
-                    await pool.execute(
-                        """
-                        INSERT INTO our_buy_rate
-                          (source_table, source_pk, side, project_id, locale,
-                           country_code, currency, rate, rate_unit_code,
-                           rate_unit_decoded, rate_usd_hour, rate_fx_as_of,
-                           synced_at, is_current)
-                        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,TRUE)
-                        ON CONFLICT (source_table, source_pk) DO UPDATE SET
-                          side=EXCLUDED.side, project_id=EXCLUDED.project_id,
-                          locale=EXCLUDED.locale, country_code=EXCLUDED.country_code,
-                          currency=EXCLUDED.currency,
-                          rate=EXCLUDED.rate, rate_unit_code=EXCLUDED.rate_unit_code,
-                          rate_unit_decoded=EXCLUDED.rate_unit_decoded,
-                          rate_usd_hour=EXCLUDED.rate_usd_hour,
-                          rate_fx_as_of=EXCLUDED.rate_fx_as_of,
-                          synced_at=EXCLUDED.synced_at, is_current=TRUE
-                        """,
+                    args_list.append((
                         src.table, str(r[src.pk_col]), src.side,
                         project_id,
                         locale,
@@ -164,7 +180,11 @@ async def sync_rates(pool: asyncpg.Pool) -> dict:
                         rate, rate_unit_code, unit,
                         usd_hour, fx_as_of,
                         started,
-                    )
+                    ))
+                # one round-trip per page instead of one per row — see
+                # module docstring, controller performance ruling.
+                async with pool.acquire() as conn:
+                    await conn.executemany(UPSERT_SQL, args_list)
                 n += len(rows)
                 last = str(rows[-1][src.pk_col])
             # rows this sync did not touch are no longer current
