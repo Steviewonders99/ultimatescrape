@@ -81,15 +81,22 @@ DDL: list[str] = [
       project_id TEXT,
       locale TEXT,
       country_code TEXT,
+      currency TEXT,
       rate NUMERIC,
       rate_unit_code TEXT,
       rate_unit_decoded TEXT,
       rate_usd_hour NUMERIC,
+      rate_fx_as_of DATE,
       synced_at TIMESTAMPTZ NOT NULL,
       is_current BOOLEAN NOT NULL DEFAULT TRUE,
       UNIQUE (source_table, source_pk)
     )
     """,
+    # CREATE TABLE IF NOT EXISTS above does not retroactively add columns to
+    # an our_buy_rate that already existed (Task 8 shipped without currency/
+    # rate_fx_as_of) -- additive backport per R2/R3.
+    "ALTER TABLE our_buy_rate ADD COLUMN IF NOT EXISTS currency TEXT",
+    "ALTER TABLE our_buy_rate ADD COLUMN IF NOT EXISTS rate_fx_as_of DATE",
     """
     CREATE TABLE IF NOT EXISTS dealforce_opportunity (
       id BIGSERIAL PRIMARY KEY,

@@ -35,6 +35,12 @@ codes overlap, e.g. rate_unit_df_0002 value='1' is also 'Per Hour',
 rate_unit_ls_0001 value='2' is also 'Per Word' — so one flat value-keyed
 table is safe and correct across all four rate source tables.)
 
+Re-ran WITHOUT the LIMIT (2026-09-22, controller-requested check):
+`SELECT value, name, code, status, is_deleted FROM um_dict WHERE
+parent_code='rate_unit' ORDER BY value::int` returns exactly these same
+**16 rows** — no 17th (or higher) code exists under parent_code='rate_unit'
+that the earlier LIMIT 50 could have hidden.
+
 Sanity-checked against the measured shape (2026-09-22, projects_db, live
 proxy, `GROUP BY rate_unit` on each source table):
 

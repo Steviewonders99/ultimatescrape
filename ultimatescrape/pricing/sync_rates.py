@@ -1,30 +1,25 @@
 """Writer 2: projects_db rate tables -> our_buy_rate mirror.
 
 Keyset-paginated single-table pulls (proxy timeout ~=27s). rate_usd_hour is
-set ONLY when the unit decodes to 'hour' AND the source row's currency is
-literally 'USD'.
+computed for ANY decoded-hourly rate with a KNOWN currency:
 
-That second condition is a deliberate departure from a naive "unit=='hour'
-implies rate_usd_hour=rate": discovery (2026-09-22, see rate_units.py and
-task-8-report.md) found the four rate source tables are NOT plain-USD
-numerics. Within rate_unit='1' ("Per Hour") specifically -- the only slice
-this writer would otherwise label as a USD hourly rate -- project_lang_pair
-is only 44.6% USD (2,322/6,036); EUR is the plurality at 43.5%, CNY 16%.
-Treating those raw numbers as dollars would silently overstate/understate
-by the EUR/CNY/USD spread, in direct violation of the standing "Currency =
-USD only" rule and the "loud failure, never silent wrong numbers" rule.
+  - currency == 'USD'      -> rate_usd_hour = rate as-is, rate_fx_as_of NULL
+  - currency != 'USD'      -> rate_usd_hour = fx.convert(rate, currency),
+                               rate_fx_as_of = the FxTable's as_of date
+  - currency unknown/blank -> rate_usd_hour = NULL, rate_fx_as_of = NULL
+                               (abstain, never guess)
 
-This module does NOT invent an FX conversion (the repo has one -- fx.py /
-normalize.py, used by sync_boards.py for competitor_listing -- reusing it
-here would need a currency column on our_buy_rate, which is out of this
-writer's scope). It abstains instead: non-USD hourly rows still mirror
-(rate, rate_unit_code, rate_unit_decoded all populated) but rate_usd_hour
-stays NULL, same as an undecodable unit. `rate` itself, for every row, is
-mirrored in ITS SOURCE CURRENCY -- our_buy_rate has no currency column to
-record which -- so `rate` alone is not safely comparable across rows or to
-the (already-USD) competitor benchmark. Only `rate_usd_hour` is a trustworthy
-USD figure. See task-8-report.md Discovery Evidence for the full currency
-breakdown per table.
+Controller ruling 2026-09-22 (see task-8-report.md "Round 2 review fixes"):
+Task 8's original cut set rate_usd_hour only for currency=='USD', which was
+the right instinct (discovery found the four rate source tables are NOT
+plain-USD numerics -- project_lang_pair is only 44.6% USD within its own
+"Per Hour" rows) but threw away ~55% of hourly coverage rather than
+converting it. This version reuses the repo's existing, already-vetted FX
+pipeline (fx.py / normalize.py, the same one sync_boards.py uses for
+competitor_listing) instead of treating non-USD as unrecoverable. `rate`
+itself is still mirrored in its source currency for every row (now WITH a
+`currency` column recording which, added in this same round -- see ddl.py),
+so any consumer can independently verify or re-derive rate_usd_hour.
 
 Three of the four source tables carry an `is_deleted` flag
 (project_lang_pair, project_resource_info, configuration_client_rate);
@@ -41,14 +36,21 @@ being numerically far larger) and silently skip or loop rows mid-page.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from pathlib import Path
 
 import asyncpg
 
 from ultimatescrape.pricing import proxydb, runs
+from ultimatescrape.pricing.fx import FxTable, load_fx
 from ultimatescrape.pricing.rate_units import RATE_SOURCES, decode
 
 PAGE = 5000
+
+#: Same daily-cached FX table sync_boards.py uses for competitor_listing --
+#: one shared cache file, refreshed at most once/day regardless of which
+#: writer runs first.
+FX_CACHE = Path.home() / "UltimateScrape" / "knowledge" / "fx_usd.json"
 
 #: Source tables that carry a soft-delete flag -- excluded at the source
 #: query (WHERE is_deleted = 0) so deleted/superseded rows never mirror as
@@ -68,10 +70,27 @@ def _country_code(locale: str | None) -> str | None:
     return None
 
 
+def _rate_usd_hour(
+    unit: str | None, currency: str | None, rate, fx: FxTable
+) -> tuple[float | None, date | None]:
+    """USD -> rate as-is, no stamp. Non-USD -> fx-converted, stamped with
+    fx.as_of. Not hourly, or currency unknown/missing, or fx has no rate for
+    it -> (None, None). Never guesses a conversion."""
+    if unit != "hour" or rate is None or not currency:
+        return None, None
+    if currency == "USD":
+        return float(rate), None
+    converted = fx.convert(float(rate), currency)
+    if converted is None:
+        return None, None
+    return round(converted, 2), fx.as_of
+
+
 async def sync_rates(pool: asyncpg.Pool) -> dict:
     run_id = await runs.start(pool, name="our_buy_rate_mirror",
                               source="uscrape pricing")
     started = datetime.now(timezone.utc)
+    fx = await load_fx(FX_CACHE)
     summary: dict = {"tables": {}}
     upserted = 0
     try:
@@ -104,11 +123,17 @@ async def sync_rates(pool: asyncpg.Pool) -> dict:
                 if not rows:
                     break
                 for r in rows:
-                    unit = decode(r.get("rate_unit"))
+                    raw_unit_code = r.get("rate_unit")
+                    unit = decode(raw_unit_code)
+                    # never store the literal string "None" — a missing
+                    # code stays SQL NULL, not str(None).
+                    rate_unit_code = (
+                        str(raw_unit_code) if raw_unit_code is not None else None
+                    )
                     rate = r.get("rate")
-                    currency = (r.get("currency") or "").strip().upper()
+                    currency = (r.get("currency") or "").strip().upper() or None
                     locale = r.get(src.locale_col) if src.locale_col else None
-                    is_hourly_usd = unit == "hour" and currency == "USD" and rate is not None
+                    usd_hour, fx_as_of = _rate_usd_hour(unit, currency, rate, fx)
                     project_id = (
                         (str(r.get(src.project_col) or "") or None)
                         if src.project_col else None
@@ -117,23 +142,27 @@ async def sync_rates(pool: asyncpg.Pool) -> dict:
                         """
                         INSERT INTO our_buy_rate
                           (source_table, source_pk, side, project_id, locale,
-                           country_code, rate, rate_unit_code, rate_unit_decoded,
-                           rate_usd_hour, synced_at, is_current)
-                        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE)
+                           country_code, currency, rate, rate_unit_code,
+                           rate_unit_decoded, rate_usd_hour, rate_fx_as_of,
+                           synced_at, is_current)
+                        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,TRUE)
                         ON CONFLICT (source_table, source_pk) DO UPDATE SET
                           side=EXCLUDED.side, project_id=EXCLUDED.project_id,
                           locale=EXCLUDED.locale, country_code=EXCLUDED.country_code,
+                          currency=EXCLUDED.currency,
                           rate=EXCLUDED.rate, rate_unit_code=EXCLUDED.rate_unit_code,
                           rate_unit_decoded=EXCLUDED.rate_unit_decoded,
                           rate_usd_hour=EXCLUDED.rate_usd_hour,
+                          rate_fx_as_of=EXCLUDED.rate_fx_as_of,
                           synced_at=EXCLUDED.synced_at, is_current=TRUE
                         """,
                         src.table, str(r[src.pk_col]), src.side,
                         project_id,
                         locale,
                         _country_code(locale),
-                        rate, str(r.get("rate_unit")), unit,
-                        (float(rate) if is_hourly_usd else None),
+                        currency,
+                        rate, rate_unit_code, unit,
+                        usd_hour, fx_as_of,
                         started,
                     )
                 n += len(rows)

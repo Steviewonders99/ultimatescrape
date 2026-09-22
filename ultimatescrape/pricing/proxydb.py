@@ -6,18 +6,25 @@ dc_cohort_attributes.py `q()` (lines 1-35, read 2026-09-22): POST
 User-Agent (the proxy rejects/mishandles some other UAs), and the
 response body is `{"rows": [...]}` — NOT a bare list.
 
+Retry/backoff mirrors q() exactly: 8 tries, sleeping `3 + 5*attempt`
+seconds between attempts (0s is never slept; only between tries), then
+raising the last exception. q() uses `time.sleep`; this is the async
+equivalent, `await asyncio.sleep`.
+
 Statement timeout ≈27s server-side: callers keep to single-table,
 keyset-paginated slices.
 """
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from ultimatescrape.pricing import config
 
 
-async def query(db: str, sql: str, *, timeout: float = 60.0, tries: int = 3) -> list[dict]:
+async def query(db: str, sql: str, *, timeout: float = 60.0, tries: int = 8) -> list[dict]:
     last_exc: Exception | None = None
     for attempt in range(tries):
         try:
@@ -38,4 +45,5 @@ async def query(db: str, sql: str, *, timeout: float = 60.0, tries: int = 3) -> 
             last_exc = exc
             if attempt == tries - 1:
                 raise
+            await asyncio.sleep(3 + 5 * attempt)
     raise last_exc  # pragma: no cover - unreachable, satisfies type checkers
