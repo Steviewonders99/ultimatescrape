@@ -66,6 +66,113 @@ def pricing_init_db(verbose: bool = typer.Option(False, "--verbose", "-v")) -> N
     asyncio.run(_run())
 
 
+@pricing_app.command("sync")
+def pricing_sync(
+    source: list[str] = typer.Option(
+        None, "--source", "-s",
+        help="Subset of writers: boards | rates | dealforce. Default: all."),
+    platforms: list[str] = typer.Option(
+        None, "--platforms", "-p", help="Board subset (boards writer only)."),
+    dry_run: bool = typer.Option(False, "--dry-run",
+                                 help="Report changes; write NOTHING."),
+    classify: bool = typer.Option(True, "--classify/--no-classify"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Daily competitor-pricing sync: boards + our rates + DealForce."""
+    _setup_logging(verbose)
+    chosen = set(source or ["boards", "rates", "dealforce"])
+
+    async def _run() -> None:
+        import asyncpg
+
+        from .pricing import config as pcfg
+        from .pricing import ddl
+        from .pricing.classify import classify_new
+        from .pricing.sync_boards import sync_boards
+        from .pricing.sync_dealforce import sync_dealforce
+        from .pricing.sync_rates import sync_rates
+
+        pool = await asyncpg.create_pool(pcfg.warehouse_dsn(), min_size=1, max_size=3)
+        failures: list[str] = []
+        try:
+            if not dry_run:
+                await ddl.apply(pool)
+            if "boards" in chosen:
+                try:
+                    s = await sync_boards(pool, platforms=platforms or None,
+                                          dry_run=dry_run)
+                    console.print(f"boards: {s}")
+                    if classify and not dry_run:
+                        c = await classify_new(pool)
+                        console.print(f"classify: {c}")
+                except Exception as exc:  # noqa: BLE001 - each writer fails independently
+                    failures.append(f"boards: {exc}")
+            if "rates" in chosen and not dry_run:
+                try:
+                    console.print(f"rates: {await sync_rates(pool)}")
+                except Exception as exc:  # noqa: BLE001 - each writer fails independently
+                    failures.append(f"rates: {exc}")
+            if "dealforce" in chosen and not dry_run:
+                try:
+                    console.print(f"dealforce: {await sync_dealforce(pool)}")
+                except Exception as exc:  # noqa: BLE001 - each writer fails independently
+                    failures.append(f"dealforce: {exc}")
+        finally:
+            await pool.close()
+        if failures:
+            console.print(f"[red]FAILED writers:[/] {failures}")
+            raise typer.Exit(1)
+
+    asyncio.run(_run())
+
+
+@pricing_app.command("status")
+def pricing_status() -> None:
+    """Last sync per writer + row counts."""
+
+    async def _run() -> None:
+        import asyncpg
+
+        from .pricing import config as pcfg
+
+        pool = await asyncpg.create_pool(pcfg.warehouse_dsn(), min_size=1, max_size=2)
+        try:
+            # init-db has not been run yet: sync_runs already exists on the
+            # real warehouse (shared with other onetake pipelines — see
+            # ddl.py's TEST_SYNC_RUNS_DDL comment) but competitor_listing /
+            # our_buy_rate / dealforce_opportunity do not, so the missing
+            # table can surface from either the runs query or the count
+            # loop below. Either way it means the same thing: no pricing
+            # sync history yet. Honest empty state, not an error — do not
+            # create the tables here.
+            try:
+                runs_rows = await pool.fetch(
+                    "SELECT DISTINCT ON (name) name, status, started_at, finished_at,"
+                    " rows_inserted, rows_updated, error"
+                    " FROM sync_runs WHERE name IN ('competitor_boards',"
+                    " 'our_buy_rate_mirror','dealforce_catalogue')"
+                    " ORDER BY name, id DESC")
+                t = Table(title="pricing sync status")
+                for col in ("writer", "status", "finished", "ins", "upd", "error"):
+                    t.add_column(col)
+                for r in runs_rows:
+                    t.add_row(r["name"], r["status"] or "",
+                              str(r["finished_at"] or ""),
+                              str(r["rows_inserted"] or 0),
+                              str(r["rows_updated"] or 0), (r["error"] or "")[:60])
+                console.print(t)
+                for tbl in ("competitor_listing", "competitor_listing_class",
+                            "our_buy_rate", "dealforce_opportunity"):
+                    console.print(f"  {tbl}: "
+                                  f"{await pool.fetchval(f'SELECT count(*) FROM {tbl}')}")
+            except asyncpg.UndefinedTableError:
+                console.print("no sync history — init-db has not been run")
+        finally:
+            await pool.close()
+
+    asyncio.run(_run())
+
+
 def _setup_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,

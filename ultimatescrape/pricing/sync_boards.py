@@ -149,12 +149,26 @@ async def sync_boards(
 
     # zero-listing anomaly guard: 0 rows from a platform holding live rows
     # is a swallowed failure, not a mass delisting.
-    live = {
-        r["platform"]: r["n"]
-        for r in await pool.fetch(
-            "SELECT platform, count(*) AS n FROM competitor_listing "
-            "WHERE delisted_at IS NULL GROUP BY platform")
-    }
+    #
+    # dry_run only: competitor_listing may not exist yet (init-db has not
+    # run). A dry-run reads only to compute a diff preview, so an
+    # UndefinedTableError here is honestly "zero existing rows", not a bug —
+    # treat it as such rather than creating the table to make it go away. A
+    # real (non-dry-run) sync always runs ddl.apply() first (see cli.py), so
+    # this branch never masks a genuine missing-table failure on write.
+    try:
+        live = {
+            r["platform"]: r["n"]
+            for r in await pool.fetch(
+                "SELECT platform, count(*) AS n FROM competitor_listing "
+                "WHERE delisted_at IS NULL GROUP BY platform")
+        }
+    except asyncpg.UndefinedTableError:
+        if not dry_run:
+            raise
+        log.info("[pricing] tables not yet created — dry-run diff computed "
+                  "against empty state")
+        live = {}
     for key in list(ok):
         if not ok[key] and live.get(key, 0) > 0:
             errors[key] = "zero-listing anomaly: fetch returned 0 while DB has live rows"
@@ -170,9 +184,15 @@ async def sync_boards(
         for l in fetched
     }
 
-    rows = await pool.fetch(
-        "SELECT id, platform, external_id, content_hash, delisted_at,"
-        " pay_min, pay_max, pay_currency, pay_unit FROM competitor_listing")
+    # Same missing-table tolerance as above, same dry_run-only scope.
+    try:
+        rows = await pool.fetch(
+            "SELECT id, platform, external_id, content_hash, delisted_at,"
+            " pay_min, pay_max, pay_currency, pay_unit FROM competitor_listing")
+    except asyncpg.UndefinedTableError:
+        if not dry_run:
+            raise
+        rows = []
     existing = {
         (r["platform"], r["external_id"]): diff.ExistingRow(
             id=r["id"], content_hash=r["content_hash"],
