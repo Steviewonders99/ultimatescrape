@@ -6,7 +6,11 @@ Additive only. Every table carries a UNIQUE constraint.
 
 from __future__ import annotations
 
+import logging
+
 import asyncpg
+
+log = logging.getLogger("uscrape.pricing")
 
 DDL: list[str] = [
     """
@@ -68,10 +72,16 @@ DDL: list[str] = [
       label TEXT NOT NULL,
       description TEXT NOT NULL,
       our_project_types TEXT[] NOT NULL DEFAULT '{}',
+      our_jc_codes TEXT[] NOT NULL DEFAULT '{}',
       dealforce_service_lines TEXT[] NOT NULL DEFAULT '{}',
       dealforce_tags TEXT[] NOT NULL DEFAULT '{}'
     )
     """,
+    # CREATE TABLE IF NOT EXISTS above does not retroactively add a column to
+    # a market_taxonomy that already existed (Task 10 shipped without
+    # our_jc_codes) -- additive backport per R2/R3, same pattern as the
+    # our_buy_rate currency/rate_fx_as_of backport below.
+    "ALTER TABLE market_taxonomy ADD COLUMN IF NOT EXISTS our_jc_codes TEXT[] NOT NULL DEFAULT '{}'",
     """
     CREATE TABLE IF NOT EXISTS our_buy_rate (
       id BIGSERIAL PRIMARY KEY,
@@ -172,7 +182,8 @@ CREATE TABLE IF NOT EXISTS sync_runs (
 )
 """
 
-#: market_type -> (our project types, dealforce service lines, dealforce tags)
+#: market_type -> (our project types, our jc_codes, dealforce service lines,
+#: dealforce tags)
 #: Vocabularies read live on 2026-09-22 (Task 10 Step 1) — every value below
 #: appears verbatim in its source vocabulary; none are invented.
 #:
@@ -181,6 +192,48 @@ CREATE TABLE IF NOT EXISTS sync_runs (
 #:     (4 distinct: 'AI', 'Annotation', 'Data Collection',
 #:      'Translation & Transcription' — only 68 rows / 7 jc_codes total, so
 #:      several market_type keys legitimately share the same coarse bucket)
+#:   our_jc_codes <- warehouse project_type_map.jc_code, the FINER tier
+#:     (2026-09-22 review). Live distinct codes, grounded by
+#:     `SELECT jc_code, canonical_category, count(*) FROM project_type_map
+#:     GROUP BY 1,2 ORDER BY 1`:
+#:       jc_0001 Annotation 21 | jc_0003 Data Collection 21 |
+#:       jc_0004 AI 4 | jc_0015 Translation & Transcription 5 |
+#:       jc_0016 Translation & Transcription 8 | jc_0017 AI 1 |
+#:       jc_0018 AI 8
+#:     Documented meanings (centric-intake worker/pipeline/paid_cohort.py
+#:     JC_TO_CANONICAL comments + docs/superpowers/specs/
+#:     2026-07-27-paid-media-beta-design.md §5):
+#:       jc_0001 "Data annotation (image/bbox)" | jc_0003 "Data Collection —
+#:       Andromeda, Centaurus, Kilo" | jc_0004 "Evaluation / grading (AMP,
+#:       ACEV2)" | jc_0014 "Domain Expert — MOS speech" (documented but NOT
+#:       observed in the live 68-row snapshot — excluded, per Step 1's
+#:       verbatim-discovered-vocabulary rule, not because it's wrong) |
+#:       jc_0015 "AdLoc / transcription QA" | jc_0016 "Translation rating" |
+#:       jc_0017 "UHRS micro-judging" | jc_0018 "Athena / Harbor / Atlas"
+#:     Populated ONLY where a documented meaning clearly and unambiguously
+#:     names ONE specific market_type (never guessed from the code string
+#:     alone):
+#:       llm-eval-rlhf <- jc_0004 ("Evaluation / grading" is exactly
+#:         "Rating ... AI model responses")
+#:       search-rating <- jc_0017 (UHRS = Microsoft's historical
+#:         search-relevance/ads-quality micro-judging platform — domain
+#:         knowledge grounding the term, not a guess from "jc_0017" itself)
+#:       data-annotation <- jc_0001 ("image/bbox" names the same work the
+#:         market_type describes, disambiguating it from linguistics-
+#:         annotation within the same coarse 'Annotation' bucket)
+#:     Left on the coarse tier (our_jc_codes stays '{}') despite touching
+#:     Translation & Transcription / Data Collection / AI:
+#:       jc_0003's comment is just project codenames ("Andromeda, Centaurus,
+#:         Kilo"), not a work-type description — no finer signal than the
+#:         coarse category, so data-collection-field stays coarse.
+#:       jc_0015/jc_0016 do NOT split cleanly across audio-transcription vs
+#:         translation-localization: jc_0015's own comment bundles two
+#:         different concepts ("AdLoc / transcription QA"), so assigning it
+#:         to one market_type and jc_0016 to the other would be a guess
+#:         dressed up as a citation. Both keys stay coarse.
+#:       jc_0018 is pure internal codenames (Athena/Harbor/Atlas) with no
+#:         work-type description at all — stays available only via the
+#:         coarse 'AI' fallback for the keys that still use it.
 #:   dealforce_service_lines <- catalogue `sl` (14 distinct)
 #:   dealforce_tags <- catalogue `tags` (12 distinct)
 #:
@@ -206,35 +259,43 @@ CREATE TABLE IF NOT EXISTS sync_runs (
 #: of the time (vs 37% with 'Data Collection') so it went to data-annotation;
 #: 'Audio' is reserved for the narrower audio-recording key rather than the
 #: broad data-collection-field bucket.
-TAXONOMY_MAPPINGS: dict[str, tuple[list[str], list[str], list[str]]] = {
-    "llm-eval-rlhf": (["AI"], ["GenAI / LLM"], ["LLM/GenAI", "RL/RLHF"]),
-    "llm-domain-expert-stem": (["AI"], [], []),
-    "llm-domain-expert-professional": (["AI"], [], []),
-    "coding-eval": (["AI"], [], []),
-    "search-rating": (["AI"], [], []),
+TAXONOMY_MAPPINGS: dict[str, tuple[list[str], list[str], list[str], list[str]]] = {
+    "llm-eval-rlhf": (["AI"], ["jc_0004"], ["GenAI / LLM"], ["LLM/GenAI", "RL/RLHF"]),
+    "llm-domain-expert-stem": (["AI"], [], [], []),
+    "llm-domain-expert-professional": (["AI"], [], [], []),
+    "coding-eval": (["AI"], [], [], []),
+    "search-rating": (["AI"], ["jc_0017"], [], []),
     "data-annotation": (
-        ["Annotation"], ["Annotation", "Data Annotation"], ["Annotation", "Text"],
+        ["Annotation"], ["jc_0001"],
+        ["Annotation", "Data Annotation"], ["Annotation", "Text"],
     ),
-    "audio-transcription": (["Translation & Transcription"], [], []),
-    "audio-recording": (["Data Collection"], [], ["Audio"]),
-    "translation-localization": (["Translation & Transcription"], [], []),
-    "linguistics-annotation": (["Annotation"], [], []),
+    "audio-transcription": (["Translation & Transcription"], [], [], []),
+    "audio-recording": (["Data Collection"], [], [], ["Audio"]),
+    "translation-localization": (["Translation & Transcription"], [], [], []),
+    "linguistics-annotation": (["Annotation"], [], [], []),
     "data-collection-field": (
         ["Data Collection"],
+        [],
         ["Data Collection", "Data collection"],
         ["Data Collection", "Image", "Video", "3D/LiDAR", "Physical AI"],
     ),
-    "content-moderation": (["AI"], [], []),
-    "writing-editing": (["AI"], [], []),
-    "ai-red-teaming": (["AI"], [], []),
-    "corporate-role": ([], [], []),
-    "other": ([], [], []),
+    "content-moderation": (["AI"], [], [], []),
+    "writing-editing": (["AI"], [], [], []),
+    "ai-red-teaming": (["AI"], [], [], []),
+    "corporate-role": ([], [], [], []),
+    "other": ([], [], [], []),
 }
 
 #: Filled by Task 10 (needs live project_type_map / dealforce vocabularies).
 #: <type column> = project_type_map.canonical_category (coarse category text)
 #: <project id column> = project_type_map.project_id (uuid; cast ::text to
 #: join our_buy_rate.project_id, which is stored as TEXT).
+#: `ours` CTE precedence (2026-09-22 review): fine wins where present, else
+#: coarse. A market_taxonomy row with a non-empty our_jc_codes matches ONLY
+#: those exact jc_code(s) (the coarse our_project_types branch is bypassed
+#: for that row entirely); a row with our_jc_codes = '{}' falls back to
+#: matching every project_type_map row whose canonical_category is in
+#: our_project_types.
 VIEW_SQL: str = """
 CREATE OR REPLACE VIEW benchmark_rate_v AS
 WITH classified AS (
@@ -278,7 +339,9 @@ ours AS (
            AS our_p50_usd_hour,
          COUNT(*)::int AS our_n
   FROM market_taxonomy mt
-  JOIN project_type_map ptm ON ptm.canonical_category = ANY (mt.our_project_types)
+  JOIN project_type_map ptm
+    ON (ptm.jc_code = ANY (mt.our_jc_codes)
+        OR (mt.our_jc_codes = '{}' AND ptm.canonical_category = ANY (mt.our_project_types)))
   JOIN our_buy_rate r
     ON r.project_id = ptm.project_id::text
    AND r.is_current AND r.side = 'buy' AND r.rate_usd_hour IS NOT NULL
@@ -323,11 +386,11 @@ async def apply(pool: asyncpg.Pool) -> None:
             """,
             key, label, description,
         )
-    for key, (ours, sls, tags) in TAXONOMY_MAPPINGS.items():
+    for key, (ours, jc_codes, sls, tags) in TAXONOMY_MAPPINGS.items():
         await pool.execute(
-            "UPDATE market_taxonomy SET our_project_types=$2,"
-            " dealforce_service_lines=$3, dealforce_tags=$4 WHERE key=$1",
-            key, ours, sls, tags,
+            "UPDATE market_taxonomy SET our_project_types=$2, our_jc_codes=$3,"
+            " dealforce_service_lines=$4, dealforce_tags=$5 WHERE key=$1",
+            key, ours, jc_codes, sls, tags,
         )
     await apply_view(pool)
 
@@ -338,9 +401,11 @@ async def apply_view(pool: asyncpg.Pool) -> None:
     # project_type_map lives in the real warehouse but not in every ephemeral
     # test DB; skip view creation rather than error when it is absent so
     # ddl.apply() stays safe to call from tests that don't need the view.
+    # Loud skip (2026-09-22 review): never silent, per §0 rule 6.
     has_ptm = await pool.fetchval(
         "SELECT to_regclass('public.project_type_map') IS NOT NULL"
     )
     if not has_ptm:
+        log.warning("benchmark_rate_v skipped: project_type_map not found")
         return
     await pool.execute(VIEW_SQL)
