@@ -405,28 +405,42 @@ class JobBoardClient:
         jobs = payload.get("jobs") or payload.get("data") or []
         out = []
         for job in jobs if isinstance(jobs, list) else []:
-            rate = job.get("payRate") or job.get("hourlyRate") or job.get("rate")
-            pay = {}
-            if rate:
-                parsed = parse_pay(str(rate)) or {}
-                pay = parsed or {
+            # payRate/hourlyRate/rate/url/description do not exist on any
+            # live job object (verified 22 Sep 2026, 8/8 listings) — found
+            # while checking outlier's structured-pay coverage (it read as
+            # 0/8, silently, via the same "field the feed doesn't have"
+            # pattern as mercor/imerit). The real fields: "maxHourlyRateUsd"
+            # (a plain int, explicitly USD, 8/8 present — a ceiling, not a
+            # floor; stored in pay_min like every other single-number rate
+            # in this codebase, so treat it as a point estimate, not a
+            # guaranteed minimum), "absolute_url", and "content" (the JD
+            # HTML — "description" isn't a key at all, so JD capture was
+            # silently empty for every outlier listing until this fix).
+            rate = job.get("maxHourlyRateUsd")
+            pay = (
+                {
                     "pay_min": _as_float(rate),
                     "pay_unit": "hour",
                     "pay_currency": "USD",
                     "pay_raw": str(rate),
                     "pay_source": "structured",
                 }
+                if rate is not None
+                else {}
+            )
+            content = str(job.get("content", ""))
             out.append(
                 Listing(
                     platform=p.key,
                     company=p.company,
                     title=job.get("title") or job.get("name", ""),
-                    url=job.get("url", "https://app.outlier.ai/en/expert/opportunities"),
+                    url=job.get("absolute_url", "")
+                    or "https://app.outlier.ai/en/expert/opportunities",
                     location=_location_text(job.get("location")) or "remote",
                     external_id=str(job.get("id", "")),
                     worker_gig=True,
-                    description_excerpt=_strip_html(str(job.get("description", "")), 300),
-                    description_full=_full_text(str(job.get("description", ""))),
+                    description_excerpt=_strip_html(content, 300),
+                    description_full=_full_text(content),
                     **pay,
                 )
             )
@@ -450,16 +464,30 @@ class JobBoardClient:
         for job in listings:
             if not isinstance(job, dict) or not job.get("title"):
                 continue
-            rate = job.get("hourlyRate") or job.get("payRate") or job.get("rate")
+            # "hourlyRate"/"payRate"/"rate" do not exist on any live job
+            # object (0/374, verified). The real fields are rateMin/
+            # rateMax (present on 374/374) plus payRateFrequency — values
+            # observed live: hourly 332, per-task 30, one-time 9, yearly 3.
+            # "hourlyPayRate" also exists in the schema but was null on
+            # every listing sampled; ignored. No currency field anywhere —
+            # USD assumed (Mercor is US-headquartered; same assumption the
+            # pre-fix code already made).
+            rate_min, rate_max = job.get("rateMin"), job.get("rateMax")
+            frequency = (job.get("payRateFrequency") or "").lower()
+            pay_unit = {
+                "hourly": "hour", "yearly": "year",
+                "per-task": "task", "one-time": "one-time",
+            }.get(frequency, "")
             pay = (
                 {
-                    "pay_min": _as_float(rate),
-                    "pay_unit": "hour",
+                    "pay_min": _as_float(rate_min),
+                    "pay_max": _as_float(rate_max),
+                    "pay_unit": pay_unit,
                     "pay_currency": "USD",
-                    "pay_raw": str(rate),
+                    "pay_raw": f"{rate_min}-{rate_max}/{frequency}",
                     "pay_source": "structured",
                 }
-                if _as_float(rate)
+                if rate_min is not None
                 else {}
             )
             # Mercor's __NEXT_DATA__ job objects carry no "id" field at all
@@ -479,6 +507,9 @@ class JobBoardClient:
                     title=title,
                     url=url,
                     location=str(job.get("location", "") or "remote"),
+                    # "createdAt" (e.g. "2026-09-21T23:55:06") is present on
+                    # 374/374 live listings; wasn't wired up before.
+                    posted_at=str(job.get("createdAt", ""))[:10],
                     external_id=_stable_external_id(listing_id, url=url, title=title),
                     worker_gig=True,
                     description_excerpt=_strip_html(str(job.get("description", "")), 300),
@@ -489,45 +520,79 @@ class JobBoardClient:
         return out
 
     async def _micro1(self, p: Platform) -> list[Listing]:
+        """micro1's job-portal API changed its contract (confirmed live
+        22 Sep 2026): the old request 400s with "Invalid action! Available
+        actions: get_all_jobs, ..." until the JSON body carries
+        ``{"action": "get_all_jobs"}``. Pagination also moved from the
+        JSON body to the URL QUERY STRING — a body ``{"page":.., "limit":
+        ..}`` is silently ignored and every "page" returns the identical
+        first 10 rows (confirmed: 7 body-paginated calls collected only 10
+        unique job_ids); ``?page=&limit=`` in the URL is what actually
+        pages through the 369 live listings (confirmed: page/limit=100
+        query params collect all 369, no duplicates, natural empty-page
+        stop). The response shape changed entirely too — job objects are
+        now keyed job_id/job_name/apply_url/date_posted/ideal_hourly_rate
+        (a {"min":..,"max":..} dict); none of the old title/hourly_rate/
+        rate/salary/id/location/description field names exist anymore.
+
+        ideal_monthly_salary_min/max and ideal_yearly_compensation exist
+        in the schema but were null on all 369 live listings sampled —
+        not extracted here (no real payload to build a fixture from); add
+        them if they're ever observed populated. The list view carries no
+        description field at all — a real one lives behind a separate
+        get_job_details(job_id) call, which would be 369 extra requests
+        per sync against an undocumented internal API. Left unfetched
+        (description_full/excerpt honestly empty rather than a fabricated
+        stand-in built from skills/domain) — flagged for a future task if
+        full JD capture for micro1 is wanted.
+        """
         out: list[Listing] = []
-        for page in range(1, 5):
+        page = 1
+        while page <= 10:  # safety cap; 369 live listings need 4 pages @ limit=100
             resp = await self._http.post(
-                "https://prod-api.micro1.ai/api/v1/job/portal",
-                json={"page": page, "limit": 100},
+                f"https://prod-api.micro1.ai/api/v1/job/portal?page={page}&limit=100",
+                json={"action": "get_all_jobs"},
                 headers={"Content-Type": "application/json"},
             )
             if resp.status_code != 200:
                 break
-            jobs = (resp.json().get("data") or {}).get("jobs") or resp.json().get("jobs") or []
+            jobs = (resp.json() or {}).get("data") or []
             if not jobs:
                 break
             for job in jobs:
-                rate = job.get("hourly_rate") or job.get("rate") or job.get("salary")
+                hourly = job.get("ideal_hourly_rate") or {}
                 pay = (
                     {
-                        "pay_min": _as_float(rate),
+                        "pay_min": _as_float(hourly.get("min")),
+                        "pay_max": _as_float(hourly.get("max")),
                         "pay_unit": "hour",
-                        "pay_currency": job.get("currency", "USD"),
-                        "pay_raw": str(rate),
+                        # No currency field anywhere in the payload; micro1
+                        # is a US-headquartered platform — same USD
+                        # assumption this adapter already made pre-fix.
+                        "pay_currency": "USD",
+                        "pay_raw": json.dumps(hourly),
                         "pay_source": "structured",
                     }
-                    if _as_float(rate)
-                    else parse_pay(str(job.get("description", "")))
+                    if hourly.get("min") is not None
+                    else {}
                 )
+                title = job.get("job_name", "")
+                url = job.get("apply_url", "") or "https://jobs.micro1.ai"
                 out.append(
                     Listing(
                         platform=p.key,
                         company=p.company,
-                        title=job.get("title", "") or job.get("job_title", ""),
-                        url=job.get("url", "") or "https://micro1.ai/jobs",
-                        location=job.get("location", "") or "remote",
-                        external_id=str(job.get("id", "") or job.get("_id", "")),
+                        title=title,
+                        url=url,
+                        location=job.get("location_type") or "remote",
+                        posted_at=str(job.get("date_posted", ""))[:10],
+                        external_id=_stable_external_id(
+                            job.get("job_id"), url=url, title=title),
                         worker_gig=True,
-                        description_excerpt=_strip_html(str(job.get("description", "")), 300),
-                        description_full=_full_text(str(job.get("description", ""))),
                         **pay,
                     )
                 )
+            page += 1
         return out
 
     async def _imerit(self, p: Platform) -> list[Listing]:
@@ -536,10 +601,16 @@ class JobBoardClient:
             return []
         out = []
         for job in resp.json().get("jobs", []):
-            # pay_rate is a bare number like "16" — no symbol, no period. It is
-            # an hourly rate in the local currency, which is why the same task
-            # reads 15 in the UK and 4 in Thailand. Currency is not published,
-            # so it is recorded as the listing's own unit rather than assumed USD.
+            # pay_rate carries two real formats live (verified 22 Sep 2026,
+            # 36 listings): a bare number like "16" — no symbol, no period,
+            # no currency field anywhere, which is why the same task reads
+            # 15 in the UK and 4 in Thailand — recorded as "local" currency
+            # rather than assumed USD (15/36 listings); or a pre-formatted
+            # "$7/Hour" string with an explicit symbol+unit (20/36
+            # listings), which numeric_pay() can't parse (not a bare float)
+            # but parse_pay()'s regex fallback already handles correctly as
+            # USD/hour. One listing had a genuinely empty pay_rate — no
+            # pay extracted, honestly (not a bug, an upstream gap).
             raw_rate = str(job.get("pay_rate", "") or "")
             pay = numeric_pay(
                 raw_rate, currency=str(job.get("currency", "") or "local"), unit="hour"
@@ -560,8 +631,17 @@ class JobBoardClient:
                     title=title,
                     url=url,
                     location=job.get("location", ""),
-                    employment_type=job.get("job_type", ""),
-                    posted_at=str(job.get("posted_date", ""))[:10],
+                    # "job_type" does not exist on any live job object;
+                    # the real field is "type" (e.g. "Independent
+                    # Contractor (Scholar)", verified 36/36 live).
+                    employment_type=job.get("type", ""),
+                    # No "posted_date" field exists upstream either. The
+                    # only date-shaped field is "expiry_date", which is
+                    # semantically different (when the posting closes, not
+                    # when it opened) AND was empty on every listing
+                    # sampled — not a substitute. iMerit genuinely
+                    # publishes no posted-date; left honestly empty.
+                    posted_at="",
                     external_id=_stable_external_id(job_id, url=url, title=title),
                     worker_gig=True,
                     description_excerpt=_strip_html(str(job.get("description", "")), 300),
