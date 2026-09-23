@@ -8,9 +8,12 @@ answer outside the taxonomy is evidence of model failure, recorded as
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 
 import asyncpg
+
+log = logging.getLogger("competitor_pricing.classify")
 
 TAXONOMY_VERSION = "v1"
 BATCH_SIZE = 10
@@ -57,7 +60,7 @@ def _default_taxonomy_lines() -> str:
     """Fallback only for callers with no database at hand (e.g. the DB-less
     golden test). Never used by ``classify_new`` — that always passes the
     live ``market_taxonomy`` rows explicitly."""
-    from ultimatescrape.pricing.ddl import TAXONOMY_SEED
+    from .ddl import TAXONOMY_SEED
     return "\n".join(f"{k}: {d}" for k, _, d in TAXONOMY_SEED)
 
 
@@ -119,16 +122,50 @@ async def classify_new(
         llm_cm = llm
 
     now = datetime.now(timezone.utc)
+    summary["failed_batches"] = 0
+    summary["skipped"] = 0
     async with llm_cm as client:
+
+        async def _classify(batch: list[dict]) -> list[tuple[dict, dict]]:
+            """Classify one batch, splitting on failure instead of aborting.
+
+            kimi-k2.6 intermittently spends its budget on reasoning and returns
+            truncated JSON (finish_reason=length). Before this, one such batch
+            raised and killed the whole step — so a single bad response left
+            every remaining listing unclassified and failed the nightly run.
+            A failed batch is now halved and retried; a single listing that
+            still fails is skipped and picked up by the next run, because it
+            has no class row yet.
+            """
+            try:
+                data, _ = await client.complete_json(
+                    build_prompt(batch, taxonomy_lines=tax_lines), system=SYSTEM,
+                    max_tokens=MAX_TOKENS, temperature=0.0, label=MODEL_LABEL,
+                )
+                results = parse_response(data if isinstance(data, dict) else {},
+                                         n=len(batch), valid_keys=valid)
+                summary["batches"] += 1
+                return list(zip(batch, results))
+            except Exception as exc:
+                summary["failed_batches"] += 1
+                if len(batch) == 1:
+                    log.warning(
+                        "classify: giving up on listing %s this run (%s); it keeps "
+                        "its unclassified state and is retried next run",
+                        batch[0].get("id"), str(exc)[:160],
+                    )
+                    summary["skipped"] += 1
+                    return []
+                log.warning(
+                    "classify: batch of %d failed (%s) — splitting and retrying",
+                    len(batch), str(exc)[:160],
+                )
+                mid = len(batch) // 2
+                return await _classify(batch[:mid]) + await _classify(batch[mid:])
+
         for start in range(0, len(listings), BATCH_SIZE):
-            batch = listings[start:start + BATCH_SIZE]
-            data, _ = await client.complete_json(
-                build_prompt(batch, taxonomy_lines=tax_lines), system=SYSTEM,
-                max_tokens=MAX_TOKENS, temperature=0.0, label=MODEL_LABEL,
-            )
-            results = parse_response(data if isinstance(data, dict) else {},
-                                     n=len(batch), valid_keys=valid)
-            for l, res in zip(batch, results):
+            pairs = await _classify(listings[start:start + BATCH_SIZE])
+            for l, res in pairs:
                 await pool.execute(
                     """
                     INSERT INTO competitor_listing_class
@@ -145,5 +182,12 @@ async def classify_new(
                     summary["unclassifiable"] += 1
                 else:
                     summary["classified"] += 1
-            summary["batches"] += 1
+
+    # Only a total wipeout is a step failure — that means a systemic fault
+    # (bad key, model withdrawn, contract change), not one unlucky response.
+    if summary["classified"] == 0 and summary["unclassifiable"] == 0 and listings:
+        raise RuntimeError(
+            f"classification produced nothing for {len(listings)} listing(s); "
+            f"{summary['failed_batches']} batch attempt(s) failed"
+        )
     return summary
